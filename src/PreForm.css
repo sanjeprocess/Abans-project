@@ -7,7 +7,7 @@
   align-items: center;
   justify-content: center;
   padding: 28px 18px;
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Noto Sans", "Segoe UI", Arial, sans-serif;
 }
 
 .preform-card {
@@ -29,19 +29,6 @@
   gap: 18px;
 }
 
-.preform-logo-wrap {
-  flex-shrink: 0;
-}
-
-.preform-logo {
-  width: 64px;
-  height: 64px;
-  object-fit: contain;
-  border-radius: 6px;
-  background: #fff;
-  padding: 4px;
-}
-
 .preform-title-block {
   color: #fff;
 }
@@ -53,15 +40,17 @@
 }
 
 .preform-subtitle {
-  font-size: 13px;
+  font-size: 14px;
   opacity: 0.95;
   margin-top: 3px;
 }
 
 .preform-subtitle-si {
-  font-size: 11px;
-  opacity: 0.82;
+  font-size: 13px;
+  opacity: 0.85;
   margin-top: 4px;
+  font-family: "Noto Sans Sinhala", "Segoe UI", Arial, sans-serif;
+  line-height: 1.4;
 }
 
 
@@ -106,7 +95,7 @@
 }
 
 .pf-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: #333;
 }
@@ -114,7 +103,8 @@
 .pf-label-si {
   font-weight: 400;
   color: #666;
-  font-size: 11px;
+  font-size: 12px;
+  font-family: "Noto Sans Sinhala", "Segoe UI", Arial, sans-serif;
 }
 
 .pf-input {
@@ -164,6 +154,8 @@
 
 .pf-otp-note-si {
   color: #888;
+  font-size: 12px;
+  font-family: "Noto Sans Sinhala", "Segoe UI", Arial, sans-serif;
 }
 
 .pf-test-badge {

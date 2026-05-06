@@ -1,2 +1,2 @@
 // API Configuration
-export const API_BASE_URL = "https://abance-backend.vercel.app";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://abance-backend-v2.vercel.app";

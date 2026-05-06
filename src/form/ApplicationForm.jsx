@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import "./ApplicationForm.css";
 import { API_BASE_URL } from "../config";
 
-const ThankYouPage = ({ onRestart }) => (
+const ThankYouPage = ({ onRestart, signingLink }) => (
   <div className="thank-you-container">
     <div className="thank-you-card">
       <div className="success-icon">
@@ -16,6 +16,20 @@ const ThankYouPage = ({ onRestart }) => (
         <br />
         Your application is under review and we will contact you immediately.
       </p>
+      {signingLink && (
+        <>
+          <button 
+            className="thank-you-button" 
+            onClick={() => window.open(signingLink, '_blank')}
+            style={{ background: '#28a745', marginBottom: '12px' }}
+          >
+            Open Signing Document
+          </button>
+          <p style={{ fontSize: '14px', color: '#666', marginBottom: '16px' }}>
+            Click above to sign your application document
+          </p>
+        </>
+      )}
       <button className="thank-you-button" onClick={onRestart}>
         Submit Another Application
       </button>
@@ -25,6 +39,28 @@ const ThankYouPage = ({ onRestart }) => (
 
 const emptyCreditRow = { institution: "", type: "", approvedAmount: "", term: "", monthlyRepayment: "", presentOS: "", security: "" };
 const emptyBankRow = { bank: "", branch: "", accountNo: "", officer: "", telephone: "" };
+const BANK_NAMES = [
+  "Bank of Ceylon",
+  "People's Bank",
+  "Commercial Bank",
+  "Hatton National Bank",
+  "Sampath Bank",
+  "Seylan Bank",
+  "Nations Trust Bank",
+  "DFCC Bank",
+  "NDB Bank",
+  "Pan Asia Bank",
+  "Union Bank",
+  "Amana Bank",
+  "Cargills Bank",
+  "LOLC Finance",
+  "LB Finance",
+  "Central Finance",
+  "National Savings Bank",
+  "Regional Development Bank",
+  "Sanasa Development Bank",
+  "State Mortgage and Investment Bank",
+];
 const emptyGuarantorRow = { fullName: "", relationship: "", nicBusinessRegNo: "", age: "", months: "" };
 const emptyLandRow = { location: "", extent: "", value: "", deedNo: "", mortgaged: "" };
 const emptyVehicleRow = { makeModel: "", value: "", regNo: "", ownership: "" };
@@ -33,7 +69,7 @@ const emptyFacilityRow = { makeModel: "", status: "", purpose: "", supplier: "",
 
 const incomeRows = [
   { key: "incomeMainSalary",      label: "Main Income / Salary",           si: "ප්‍රධාන ආදායම / වැටුප",   ta: "முக்கிய வருமானம் / சம்பளம்" },
-  { key: "incomeOtherAllowances", label: "Other Allowances / Commissions", si: "වෙනත් දීමනා / කොමිස්",     ta: "பிற கொடுப்பனவு / கமிஷன்" },
+  { key: "incomeOtherAllowances", label: "Other Allowances / Commissions", si: "වෙනත් දීමනා / කොමිස්",     ta: "பிற கொடுப்பனவு / கமிஂசன்" },
   { key: "incomeAdditional",      label: "Additional Income",              si: "අමතර ආදායම",               ta: "கூடுதல் வருமானம்" },
   { key: "incomeOther",           label: "Other",                          si: "වෙනත්",                     ta: "மற்றவை" },
 ];
@@ -62,6 +98,7 @@ const defaultFormData = {
   maritalStatus: "", nationality: "", gender: "", dateOfBirth: "",
   noOfChildren: "", childAge1: "", childAge2: "", childAge3: "", totalDependants: "",
   qualifications: [],
+  otherQualification: "",
   familyMembers: [
     { member: "Father", memberSi: "පියා", memberTa: "தந்தை", name: "", contact: "" },
     { member: "Spouse", memberSi: "කලත්‍රයා/කලත්‍රිය", memberTa: "கணவன் / மனைவி", name: "", contact: "" },
@@ -87,6 +124,7 @@ const defaultFormData = {
   preferredLanguage: "",
   locationOfLeasedAsset: "",
   fundSources: [],
+  otherFundSource: "",
   annualTurnoverIndividual: "",
   annualTurnoverBusiness: "",
   otherConnectedBusiness: "", reasonForLoan: "",
@@ -101,9 +139,79 @@ function ApplicationForm() {
   const [submitted, setSubmitted] = useState(false);
   const [apiStatus, setApiStatus] = useState("idle");
   const [apiMessage, setApiMessage] = useState("");
+  const [errors, setErrors] = useState({});
   const [isSubmittedSuccessfully, setIsSubmittedSuccessfully] = useState(false);
+  const [signingLink, setSigningLink] = useState(null);
 
-  const handleChange = (e) => { const { name, value } = e.target; setFormData(p => ({ ...p, [name]: value })); };
+  const validateNumberInput = (value) => {
+    const cleaned = value.replace(/[^0-9]/g, "");
+    const hasInvalid = value !== cleaned;
+    return { cleaned, hasInvalid };
+  };
+
+  const validatePhoneInput = (value) => {
+    const cleaned = value.replace(/[^0-9]/g, "");
+    const hasInvalidChars = value !== cleaned;
+    
+    if (hasInvalidChars) {
+      return { cleaned, error: "Please enter numbers only" };
+    }
+    
+    if (cleaned.length > 0 && (cleaned.length < 9 || cleaned.length > 10)) {
+      return { cleaned, error: "Phone number must be 9 or 10 digits" };
+    }
+    
+    return { cleaned, error: "" };
+  };
+
+  const validateEmailInput = (value) => {
+    // Must contain @gmail.com, have text before @gmail.com, and no spaces
+    const gmailRegex = /^[^@\s]+@gmail\.com$/;
+    const isValid = gmailRegex.test(value);
+    return { isValid, error: isValid ? "" : "Invalid Gmail. Enter valid Gmail" };
+  };
+
+  const numericFields = new Set([
+    "homeContact", "officeContact", "fax", "mobile1", "mobile2",
+    "monthsAtAbove", "noOfChildren", "childAge1", "childAge2", "childAge3", "totalDependants",
+    "telephone", "accountNo", "approvedAmount", "monthlyRepayment", "presentOS", "currentValue", "noOfShares", "value",
+    "age", "months", "incomeMainSalary", "incomeOtherAllowances", "incomeAdditional", "incomeOther",
+    "expenseHousehold", "expensePersonal", "expenseLoanLease", "expenseCreditCard", "expenseFuel", "expenseOther",
+  ]);
+
+  const phoneFields = new Set([
+    "homeContact", "officeContact", "fax", "mobile1", "mobile2",
+    "reference1Contact", "reference2Contact", "telephone"
+  ]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Phone field validation (check before numericFields since phone fields are also numeric)
+    if (phoneFields.has(name)) {
+      const { cleaned, error } = validatePhoneInput(value);
+      setFormData(p => ({ ...p, [name]: cleaned }));
+      setErrors(p => ({ ...p, [name]: error }));
+      return;
+    }
+
+    if (numericFields.has(name)) {
+      const { cleaned, hasInvalid } = validateNumberInput(value);
+      setFormData(p => ({ ...p, [name]: cleaned }));
+      setErrors(p => ({ ...p, [name]: hasInvalid ? "Please enter numbers only" : "" }));
+      return;
+    }
+
+    if (name === "email") {
+      const { isValid, error } = validateEmailInput(value);
+      setFormData(p => ({ ...p, [name]: value }));
+      setErrors(p => ({ ...p, [name]: error }));
+      return;
+    }
+
+    setFormData(p => ({ ...p, [name]: value }));
+  };
+
   const toggleCheck = (field, val) => setFormData(p => ({ ...p, [field]: p[field] === val ? "" : val }));
   const toggleArray = (field, val) => setFormData(p => {
     const arr = p[field] || [];
@@ -119,9 +227,60 @@ function ApplicationForm() {
     return { ...p, fundSources: ex ? p.fundSources.filter(i => i !== val) : [...p.fundSources, val] };
   });
 
+  const tableNumericKeys = new Set(["accountNo", "telephone", "approvedAmount", "monthlyRepayment", "presentOS", "currentValue", "noOfShares", "value", "age", "months", "contact"]);
+
   const tableChange = (field, index, key, value) => {
-    const updated = [...formData[field]]; updated[index][key] = value;
-    setFormData(p => ({ ...p, [field]: updated }));
+    const errorKey = `${field}.${index}.${key}`;
+    const { cleaned, hasInvalid } = tableNumericKeys.has(key)
+      ? validateNumberInput(value)
+      : { cleaned: value, hasInvalid: false };
+
+    setFormData((prev) => {
+      const updated = [...prev[field]];
+      updated[index] = { ...updated[index], [key]: cleaned };
+      return { ...prev, [field]: updated };
+    });
+    setErrors((prev) => ({ ...prev, [errorKey]: hasInvalid ? "Please enter numbers only" : "" }));
+  };
+
+  const handleBankChange = (index, value) => {
+    const updated = [...formData.bankDetails];
+    updated[index] = { ...updated[index], bank: value };
+    setFormData(p => ({ ...p, bankDetails: updated }));
+  };
+
+  const handleBankFieldChange = (index, field, value) => {
+    const { cleaned, hasInvalid } = validateNumberInput(value);
+
+    const updated = [...formData.bankDetails];
+    updated[index][field] = cleaned;
+
+    setFormData({
+      ...formData,
+      bankDetails: updated,
+    });
+
+    setErrors({
+      ...errors,
+      [`${field}_${index}`]: hasInvalid ? "Please enter numbers only" : "",
+    });
+  };
+
+  const handleCreditFacilityFieldChange = (index, field, value) => {
+    const { cleaned, hasInvalid } = validateNumberInput(value);
+
+    const updated = [...formData.creditFacilities];
+    updated[index][field] = cleaned;
+
+    setFormData({
+      ...formData,
+      creditFacilities: updated,
+    });
+
+    setErrors({
+      ...errors,
+      [`${field}_${index}`]: hasInvalid ? "Please enter numbers only" : "",
+    });
   };
 
   const addRow = (field, emptyRow) => setFormData(p => ({ ...p, [field]: [...p[field], { ...emptyRow }] }));
@@ -175,7 +334,21 @@ const handleSubmit = async (e) => {
     setApiStatus("success");
     setApiMessage("API connection successful. Application submitted.");
     setSubmitted(true);
-    setIsSubmittedSuccessfully(true);
+    
+    // Handle signing link if available
+    if (data.signingLink) {
+      setApiMessage("✅ Application submitted! Opening your document...");
+      setSigningLink(data.signingLink);
+      
+      // Wait 1.5 seconds then open the signing link and show thank you page
+      setTimeout(() => {
+        window.open(data.signingLink, '_blank');
+        setIsSubmittedSuccessfully(true);
+      }, 1500);
+    } else {
+      // No signing link — just show thank you page
+      setIsSubmittedSuccessfully(true);
+    }
   } catch (error) {
     console.error("API submit error:", error);
     setApiStatus("error");
@@ -195,7 +368,7 @@ const handleSubmit = async (e) => {
   };
 
   if (isSubmittedSuccessfully) {
-    return <ThankYouPage onRestart={handleRestartApplication} />;
+    return <ThankYouPage onRestart={handleRestartApplication} signingLink={signingLink} />;
   }
 
   const nicBoxes      = splitValueToBoxes(formData.nicNo, 12);
@@ -219,11 +392,6 @@ const handleSubmit = async (e) => {
         {/* HEADER */}
         <header className="paper-header">
           <div className="logo-panel">
-            <img
-              src="data:image/webp;base64,UklGRjIQAABXRUJQVlA4ICYQAABwegCdASraAdoBPp1OpE0lpKOiInD4yLATiWdu4XSCfmALN/3veHyL6U/j/3bnR/JNOjFs8X6W88v+Z9W+4D3ecM++de97/AfrtuBOCu076nqCeyPgBOv7QLA/+x8ydLXoB+Ul/teconRwpErVXm391/df3X91/df23NandhpnwzFTuhpnwzFZtScndDTPhmKndDTPhs2Tk7oaZ8MxU7oaZ8MxpN3dDTPhmKndDTPhmKoastWGjqTk7oaZ8MxU7rUhTPhmKndDTPhmKndDcQVJyd0NM+GYqd0NM+GzZOTuhpnwzFTuhpnwzGk3d0NM+GYqd0NM+GYqhqy1YaOpOTuhpnwzFTutSCf0g1IjNxCickDjEIxJPYqelloxInfXUnJxlpEmgzbHvMiamir+OU8MDetVeqGkIPlylqvMZ++BVc02YUmKNFgL/AHG4wIV1MfRPxj+18+LEvg1jxn73rM11QDZkfSP/pdli4G2/q//xHn/z7PF0BQXg7txskPoBAayNB1L7dpIWRzo930DZL1PprYsVmiba8H1i/u1sobOVZlcaJo4qidj3pSF3Xlpz7ke9eDKNj3ZdFkcjI3c1l7+ubuFHSTga9LDNU44qdYIa9KW3acyEJHKrO9BB8WI9tOz6L0UPAuPrc+xGDYt+OV8gy3mRuLJMew4hR9owc/GxSaCERdt/oMkly4QPQ4OvfcGpmNpGurRUuELd9Ytkq4CYTxwHQAEWdDLyc6VICc7wbqblvbOAHL3FxoZiMNm9Cb5fFsp0kTbouF10sRtFoI9qa2ojGhfHVah75J2pswqonHxz3T/RUlwKusENem2fY+ZFUqq/IWXVzSZuJV9+/qfjo9NN6VgSpMXon507Wil4NI95w2tpwXIc+X+rGsYbKexAX5kFH7UegFwE7Wb0QnILWqs7hl7a72I1jkQImCjocpO8WMVTnhrm6lH810NIj5izzD6LH/xI/oZQUkhISjV0q5AcsB0QW4NCnE8Z/uuokDt+KSPry0QITi72YZRIZ9m7fRohYzY7fhmy3Wd34SXF1gbys3+hIYPr1bfLdsSlA8YZtupNma88fFKOJvzegK5swD0JzFRkYx+Qh9hpODAPUxU7oaZ8M1byndDTPhmKndDTPhmKz8gtWGjqTk7oaZ8MxU8OOXcB6mKndDTPhmKndFIF1Jyd0NM+GYqd0NM+LyBOTuhpnwzFTuhpnwzVvKd0NM+GYqd0NM+GYrPyC1YaOpOTuhpnwzFTw45dwHqYqd0NM+GYqd0UgXUnJ3Q0z4Zip3Q0z4uN3wI/OoUsNbjW41uNbjW40eXdhIAAP7/Bx3fa5LgReTR3AghgRduTYQ576bCHPfTYQ576bCHPfTYQ576bCHPfW3bYmgJSx/g0dA4bm1af9kQAAAAjN2xYZiHwAAAAAACPtAAAAAACUHAAAAAADO/GcHKMWmbFrxdCX/ZtjbUO3nzUSmcUDb1ThTyyL8xV9REUG9Z7ABa+WZFxL5AcZf7pefZJojxmH3qNxMwQEi1oYwFazp0yi5vyNoa92JAPRH1lMH5kD8AZ5AaGeFTYSuyBG3Yt2R7QVyb++LtzPmTIEe5rcI6MgtctAgp0Tr80D3nWLKqhTt19S5LnZYt3lz0PCO9l6VeaZtLBKJ2FM87qyGAbxNQscGMudNCqLmylQtDZ+IjdoNprslKbSoKxFqk3u/Fv6lNqnXR0NB8aTw+SpruEDTXrKAiAQON4Osrn1hk7BHsiuxyj0bXL41mPQ+tqeMMLKjMB4LFU89m9iLZrAA18FJQexsBh2wnegwDd82ooIRDsLp+ksCPSkOV7jSL+pSRwz66CTC3d6SAj3edOUPRzF7ICA429Ug28i3EAoT1lK1V+MYzLnDza+K6av9pHwOL/E2Zapo64bZ767uTIPcAhjeF0ToN9U+B/wLy2rlhWsyHAU8NthMRlqAFS5o682zEET96WAluCgLcC3RaLR0L/DFB0Vk1fqREiMGEcA2yY6fUdEz9iHirvGrdSomJiIRoer0f7afAUWlrHWBZT+t+9abyIpH8NmF+/BRZ2Oz+Ekf3FyqAzu+luDI7CRcsfDoJTFXHDOBD2Hanr+0BurdyV0dF25e2pEsl2YUsylSPJhf/6HJ9mPlccdIVvlQqvXNrymkutEYhIg/yyHYGzUlbtO1jFk5eg13kVi06NFFbVfXYC31ih0XYmKjGhg57yzB0b2dbCgwk745v5pquLzzBMiAyGPwf19Tmm+mmCnjR0OVCxvs45MbxP4qfP4K4uUocOq/7QTWpquA0K9g+ofI2FH36IrhQ0708rcK7+7H+wN2951LynHRmJvzHFMuA2wMe/MmoI57oSKhp7qrMYB0Uy0fqi6wfrgE1qUPUPfnhZ85Bh/oCN4UIbDqRFYfp5IVC0FkN1Z4fMEg+5zYRX5cbL6VuK/M3EQCXoK4s/xt03uQ+flPKTPWt/fUg0ZzF5i7BfrV6mwLWHyEd9b05kmoj9/7GEWn/nbM3lsM3kHQBffW/F8x16YtDATyx1G1+5mKphVLgNjL/w1/lwDa70bI4jyE7x0LyakXLELALQ3KuUdromzre1OK5Qg7I7v0xmAx/iwu1fnAhA++qzrzkkapWIGvs3YkTp+idw3AznyKZDOpu8yAL+h8mIniW+UJv1qi7vXeucGLOiceD5fcFHdYTlkYXCXh1AkRydhZNglOkCek3xQPWB45w9+3BXWeqAFkmPos5QmNi1MLNMJS4poQ0FSUFVRZrI+U81Hy1EyNBVEccAj5gtAWKzywojPeri3h4KnU/D3+rDVBZ7EyS0gbcCg8gMHvcjI6SYrC9a7hTcKZ7ty+4EdFzExSli3kAdNhgfmoGkrjMV3EZbhWoK0EgtVHC/tpzNXTLJwrfQ5SJplS/BEEAmJl1e6vQ7EaRnwFLxU+jmiECsO2c0rnHEr8P2MrfFdJzo6YHmjonB5P1Ix8EOFbxo/h/J8KuZyjz3+N9ndV874le3C3a1P/3qpm87Kxl8tS4X3YYxEp5bFExxpoIsNnIP8UnL1ih9vtJGKGSF8KtePKdlTERkgGwz8UXLER1KNxywoz73zza9BcZTooUbV0R18IWXpuxb2ItSH+iAKyjOAr/yWAFkl+9nZRYf+J/cHbq4ChvWAYRh34cGgJZ2c31fm6TeCufnRtMiymJrgTEODJL1FvVe0CpPyYkUwDLkU52F/Lu5qRmjHt7dWgR+YC4W62B6O/xJ+GboVVut0quOJZ5/A+ETXjEl6L/4PLJtaXxBsF6Gq7MA7cXq2HMg5uDVxQ5bSXMmoCn/v+VrPEVoAJh+Kt9glBufUqZSczffxGh/Jqy4KWa2qjgT6FP83Oj5TLutwyyzOTwjJIXb1d3+RjTXu1Jw3HVXl+g3HCoTWPyVRkco66PlnGtUmFqx3G7sisIgWzoJOXYa1mCEqO4UvCkrKRmaBATLw2oLt9V11rGXf3uai3gxBAzWeEXoCII/f4+/tzRo+KaKhv2LRDYkm9KNEsRN/hoTnN8pNe6+3z3jlo0EMD0QZtMOEGq4rJm+IpkUcyys60FDGce0iTjCwj+nMpV36yhqOt0/i/1GZjV5ohCGC8Fm24EKE+2MGak/uJ+oNp3+pzIDE8OtpgTuNTOrvocIWDP7E512yj5fZP+RyKjt2J3AAVrXufjqfCXlkgC1fb7eKWTca5RCQzm7gBpum0yNP3BQm87odpm/JAftsX7lk97okioO7yI1NCodD1xrHBIiLwDVwNz486ArCFvjnvLSXeBOFBuoaay9afZs3HurtOQxeUcDRSPxbu+o1s55kly8wuw1Wrt+bXhvLpMZn//0WIZDAu+4i/ZCgAD0t5mrhNSrUpkyyakW9czZi2jFh2HFC8hjJu89zTHBCGpA4y3KvhuiZcHh56QO3vVrAWUPp7ZINcBnBqJISV5f+zSFd+6z3wGQMS/lUnpsVYrIaEJPo4PDhq51EJFr1t1fTOM+T7O0nT7vLBFSF0idmIiQF5yMJMfs4iUh3ASw+Kz7IlFphfqMXlPExsxRIHgbscrucYPIbXSDMDVYk9fCBSpPAttlimgtTtE0ff90jgh0R/X2w8YZAnlJe+fiyEH4Jis4IQhF1z1MNc5wBQV7Yl3+URwAe/43YPSgAo3ADotdFBNAPZ8qY3HVcAcHH3N+d7tzoOZX0/8Lr/c3m3Tuem9uB2qlhsGAjnuLNxEV6hb0B+blDogPkgUiTqUWdGl4wKgAHDHmIw3BE6cbxgwqZYSUL7sLpkZ0ax8RKMU05oAgsiV41e+flzqPrxLnOQpkKEEefPfuP6tu6IjKlKzzTvouBE+K8ECi2KNZJPiSOoTYLrmtIYdlYQ8/PItEwoBiswCRjJy+sBXHih60hk5mTi5sfnFqXVlStnES5D58SDteBftWEf7trV1jB4z0Rhk+6r06V7N6xr03fX9JMviKnBaOK7LeCADeSzHL8VoeUrm6JEFZFV+v93IghyMXSZbsECiBSVrkC17htC6nJvU5OTmz9sK4xi1kTNnDG1zK75RPozqSzU2bw9XdSKNX+Y+mpT4QxTWd2If3riI1aI1YwiIfKn8dwuM0MdtCcGe7Zsr/g0+ub8z4DAQSN/zA2Qs6j7G9YZ7Zo+Gg+KB1JSA4EMYJrSqUAcuq48ZbK/8LLM0c4MH+BZg8FVJLwbUeFN47m04wDEfv96nKZpkGxz/uGv0bEi82Zs2VQ1kLYzhWqR2zLK1cg8cODUFrISLBrMHX92vXgE0eCAux/pUxGLng1HC6SXcsErCvJPEWBiRge3P37LBQelthoT8due3udLrYKE6ro/pgkwMetJVIWT+vZE4CgsRYT+TnNY1kS9+dxe2C2QU1AEe2ueGj38QMcNHgHQupuxuzUKU+ycEnU/0e8Cen3hv3mJEZsVvBaFhAhXHw2YaEU4sgT2kmhjaniuTa0ypgJ2hYn/uDOHhYXRxUnJ2Ri7LKh0XofqR445LpJ21tkaBP09dz8SEkvcSX/+K8eG3ZApVUMFmwIrd4e7/FcYcLJcXFHtQfb8Z5MNK0CmeEyDh88RG4J89TPF+5nczJgb5s1SYuamFbt4od51wbzc9p9WgXRt6eMx+qVOQnr47b1gGEuevzA5EWd961rSWT9JILC2twartDKGkeQkhxBfuwmQMG/YHkNZLdPdYctzYOnDShRyItWy7eM6AOhdI/B9H92mTZ27tBQnFvqs9CDQr4+v7Rpd+m/tj7ZXdnFhVtCSO4NVWEcpi4LklBfCyQD6CWOrfrVDJEP8azWKYdUcEkXzJkIH1QPN/qaU1hyCvIwWQLja/t9AqS5wLJRalumO2E6UvveLONkijZoJM/ya+frkrM9B4gVLjOQiUI6/XGEjon18raUxlt+eIhylD4kBDQMvdAqGcjaIGeRBGMU5ogZmQJDRVVLBRlJpKvTd/t3sz4/G8hIvz6kv1dwoy8vgAvI5AAADLiAAAAAADWiAAAAAADWiAAAAe3BhT6N8enTNI78mjJI7CNGSR2EaMkjsI0dqQAAA="
-              alt="Abans Finance PLC"
-              className="logo-img"
-            />
           </div>
           <div className="company-panel">
             <div className="company-name">Abans Finance PLC</div>
@@ -243,229 +411,821 @@ const handleSubmit = async (e) => {
 
         {/* 1. Full Name */}
         <section className="paper-section">
-          <div className="section-row">
-            <div className="question-cell">
-              <span className="q-num">1).</span>
-              <div className="q-labels">
-                <div className="q-en">Full Name of Applicant</div>
-                <div className="q-sub">as per the NIC</div>
-                <div className="q-sub">please underline the surname</div>
-                <div className="q-si">අයදුම්කරුගේ සම්පූර්ණ නම</div>
-                <div className="q-si">(ජා.හැ.අ. අනුව)</div>
-                <div className="q-si">(උරුම නම යට ඉරි ඇදිය යුතුය)</div>
-                <div className="q-ta">விண்ணப்பதாரரின் முழுப் பெயர்</div>
-                <div className="q-ta">(தே.அ.அ படி)</div>
+          <div className="sec-head">
+            <span className="q-num">1).</span>
+            <span className="q-en">Applicant Details</span>
+            <span className="q-si">අයදුම්කරුගේ විස්තර</span>
+            <span className="q-ta">விண்ணப்பதாரர் விவரங்கள்</span>
+          </div>
+          <div className="applicant-grid">
+            {/* Applicant Details Card */}
+            <div className="applicant-card">
+              <div className="applicant-header">
+                <div className="applicant-icon">👤</div>
+                <div className="applicant-title">
+                  <div className="q-en">Full Name of Applicant</div>
+                  <div className="q-si">අයදුම්කරුගේ සම්පූර්ණ නම</div>
+                  <div className="q-ta">விண்ணப்பதாரரின் முழுப் பெயர்</div>
+                </div>
+              </div>
+              <div className="applicant-fields">
+                <div className="app-field">
+                  <div className="app-subtext">
+                    <div className="q-en">as per the NIC</div>
+                    <div className="q-si">(ජා.හැ.අ. අනුව)</div>
+                    <div className="q-ta">(தே.அ.அ படி)</div>
+                  </div>
+                  <textarea
+                    className="app-textarea"
+                    name="fullName"
+                    value={formData.fullName}
+                    onChange={e=>{handleChange(e);autoGrow(e);}}
+                    rows={1}
+                    placeholder="Enter full name..."
+                  />
+                </div>
               </div>
             </div>
-            <div className="answer-cell">
-              <textarea className="auto-textarea" name="fullName" value={formData.fullName} onChange={e=>{handleChange(e);autoGrow(e);}} rows={1} placeholder="Enter full name..." />
+
+            {/* Residential Status Card */}
+            <div className="applicant-card">
+              <div className="applicant-header">
+                <div className="applicant-icon">🏠</div>
+                <div className="applicant-title">
+                  <div className="q-en">Residential Status</div>
+                  <div className="q-si">නේවාසික තත්ත්වය</div>
+                  <div className="q-ta">வசிப்பு நிலை</div>
+                </div>
+              </div>
+              <div className="applicant-fields">
+                <div className="app-field">
+                  <div className="qual-opts">
+                    {[["Own","තමන්ගේ","சொந்தம்"],["Rented","කුලියට","வாடகை"],["Mortgaged","උකස්","அடகு"],["With parents","දෙමාපියන් සමග","பெற்றோருடன்"]].map(([en,si,ta]) => (
+                      <label key={en} className="qual-card">
+                        <input
+                          type="radio"
+                          name="residentialStatus"
+                          checked={formData.residentialStatus===en}
+                          onChange={() => setFormData(p => ({ ...p, residentialStatus: en }))}
+                        />
+                        <div className="qual-card-content">
+                          <div className="q-en">{en}</div>
+                          <div className="q-si">{si}</div>
+                          <div className="q-ta">{ta}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="app-field">
+                  <label className="app-label">
+                    <div className="q-en">Permanent Address</div>
+                    <div className="q-si">ස්ථිර ලිපිනය</div>
+                    <div className="q-ta">நிரந்தர முகவரி</div>
+                  </label>
+                  <textarea
+                    className="app-textarea"
+                    name="permanentAddress"
+                    value={formData.permanentAddress}
+                    onChange={e=>{handleChange(e);autoGrow(e);}}
+                    rows={2}
+                    placeholder="Enter permanent address..."
+                  />
+                </div>
+                <div className="app-field">
+                  <label className="app-label">
+                    <div className="q-en">Mailing Address</div>
+                    <div className="q-si">තැපැල් ලිපිනය</div>
+                    <div className="q-ta">அஞ்சல் முகவரி</div>
+                  </label>
+                  <textarea
+                    className="app-textarea"
+                    name="mailingAddress"
+                    value={formData.mailingAddress}
+                    onChange={e=>{handleChange(e);autoGrow(e);}}
+                    rows={2}
+                    placeholder="Enter mailing address..."
+                  />
+                </div>
+                <div className="app-field">
+                  <label className="app-label">
+                    <div className="q-en">Duration at above</div>
+                    <div className="q-si">ඉහත ලිපිනයේ කාලය</div>
+                    <div className="q-ta">மேலுள்ள முகவரியில் காலம்</div>
+                  </label>
+                  <div className="duration-grid">
+                    <div className="duration-item">
+                      <label className="duration-label">
+                        <div className="q-en">Years</div>
+                        <div className="q-si">අවුරුදු</div>
+                        <div className="q-ta">வருடம்</div>
+                      </label>
+                      <input
+                        type="number"
+                        className="duration-input"
+                        name="yearsAtAbove"
+                        value={formData.yearsAtAbove}
+                        onChange={handleChange}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="duration-item">
+                      <label className="duration-label">
+                        <div className="q-en">Months</div>
+                        <div className="q-si">මාස</div>
+                        <div className="q-ta">மாதம்</div>
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        className="duration-input"
+                        name="monthsAtAbove"
+                        value={formData.monthsAtAbove}
+                        onChange={handleChange}
+                        placeholder="0"
+                      />
+                      {errors.monthsAtAbove && <span className="error-text">{errors.monthsAtAbove}</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Details Card */}
+            <div className="applicant-card">
+              <div className="applicant-header">
+                <div className="applicant-icon">📞</div>
+                <div className="applicant-title">
+                  <div className="q-en">Contact Details</div>
+                  <div className="q-si">සම්බන්ධතා විස්තර</div>
+                  <div className="q-ta">தொடர்பு விவரங்கள்</div>
+                </div>
+              </div>
+              <div className="applicant-fields">
+                <div className="app-field">
+                  <label className="app-label">
+                    <div className="q-en">Contact No</div>
+                    <div className="q-si">දුරකතන අංකය</div>
+                    <div className="q-ta">தொடர்பு இலக்கம்</div>
+                  </label>
+                  <div className="contact-grid">
+                    <div className="contact-item">
+                      <label className="contact-label">
+                        <div className="q-en">Home</div>
+                        <div className="q-si">නිවස</div>
+                        <div className="q-ta">வீடு</div>
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        className="contact-input"
+                        name="homeContact"
+                        value={formData.homeContact}
+                        onChange={handleChange}
+                        placeholder="Enter home contact"
+                      />
+                      {errors.homeContact && <span className="error-text">{errors.homeContact}</span>}
+                    </div>
+                    <div className="contact-item">
+                      <label className="contact-label">
+                        <div className="q-en">Office</div>
+                        <div className="q-si">කාර්යාලය</div>
+                        <div className="q-ta">அலுவலகம்</div>
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        className="contact-input"
+                        name="officeContact"
+                        value={formData.officeContact}
+                        onChange={handleChange}
+                        placeholder="Enter office contact"
+                      />
+                      {errors.officeContact && <span className="error-text">{errors.officeContact}</span>}
+                    </div>
+                    <div className="contact-item">
+                      <label className="contact-label">
+                        <div className="q-en">Fax</div>
+                        <div className="q-si">ෆැක්ස්</div>
+                        <div className="q-ta">தொலைநகல்</div>
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        className="contact-input"
+                        name="fax"
+                        value={formData.fax}
+                        onChange={handleChange}
+                        placeholder="Enter fax number"
+                      />
+                      {errors.fax && <span className="error-text">{errors.fax}</span>}
+                    </div>
+                    <div className="contact-item">
+                      <label className="contact-label">
+                        <div className="q-en">Mob -1</div>
+                        <div className="q-si">ජංගම 1</div>
+                        <div className="q-ta">கையடக்கி 1</div>
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        className="contact-input"
+                        name="mobile1"
+                        value={formData.mobile1}
+                        onChange={handleChange}
+                        placeholder="Enter mobile 1"
+                      />
+                      {errors.mobile1 && <span className="error-text">{errors.mobile1}</span>}
+                    </div>
+                    <div className="contact-item">
+                      <label className="contact-label">
+                        <div className="q-en">Mob -2</div>
+                        <div className="q-si">ජංගම 2</div>
+                        <div className="q-ta">கையடக்கி 2</div>
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        className="contact-input"
+                        name="mobile2"
+                        value={formData.mobile2}
+                        onChange={handleChange}
+                        placeholder="Enter mobile 2"
+                      />
+                      {errors.mobile2 && <span className="error-text">{errors.mobile2}</span>}
+                    </div>
+                    <div className="contact-item email-item">
+                      <label className="contact-label">
+                        <div className="q-en">Email</div>
+                        <div className="q-si">විද්‍යුත් ලිපිනය</div>
+                        <div className="q-ta">மின்னஞ்சல்</div>
+                      </label>
+                      <input
+                        type="email"
+                        className="contact-input"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        placeholder="Enter email address"
+                      />
+                      {errors.email && <span className="error-text">{errors.email}</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* 2. Residential Status */}
+        {/* 3–8 Personal Identity Details */}
         <section className="paper-section">
-          <div className="section-row">
-            <div className="question-cell">
-              <span className="q-num">2).</span>
-              <div className="q-labels">
-                <div className="q-en">Residential Status</div>
-                <div className="q-si">නේවාසික තත්ත්වය</div>
-                <div className="q-ta">வசிப்பு நிலை</div>
-              </div>
+          <div className="sec-head wrap-head">
+            <span className="q-num">3–8</span>
+            <div>
+              <div className="q-en">Personal Identity Details</div>
+              <div className="q-si">පුද්ගල හැඳුනුම් විස්තර</div>
+              <div className="q-ta">தனிப்பட்ட அடையாள விவரங்கள்</div>
             </div>
-            <div className="answer-cell">
-              <div className="res-options">
-                {[["Own","තමන්ගේ","சொந்தம்"],["Rented","කුලියට","வாடகை"],["Mortgaged","උකස්","அடகு"],["With parents","දෙමාපියන් සමග","பெற்றோருடன்"]].map(([en,si,ta]) => (
-                  <label key={en} className="res-opt">
-                    <input type="checkbox" checked={formData.residentialStatus===en} onChange={() => toggleCheck("residentialStatus", en)} />
-                    <div><div className="q-en">{en}</div><div className="q-si">{si}</div><div className="q-ta">{ta}</div></div>
+          </div>
+          <div className="identity-grid">
+            <div className="identity-input-card">
+              <label className="identity-label">
+                <div className="q-en">NIC No</div>
+                <div className="q-si">ජා.හැ.අ. අංකය</div>
+                <div className="q-ta">தே.அ.அ. எண்</div>
+              </label>
+              <input
+                className="modern-input"
+                name="nicNo"
+                value={formData.nicNo}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="identity-input-card">
+              <label className="identity-label">
+                <div className="q-en">Date of Birth</div>
+                <div className="q-si">උපන් දිනය</div>
+                <div className="q-ta">பிறந்த தேதி</div>
+              </label>
+              <input
+                className="modern-input"
+                name="dateOfBirth"
+                value={formData.dateOfBirth}
+                onChange={handleChange}
+                placeholder="YYYYMMDD"
+              />
+            </div>
+            <div className="identity-input-card">
+              <label className="identity-label">
+                <div className="q-en">Passport No</div>
+                <div className="q-si">විදේශ ගමන් බලපත්‍ර අංකය</div>
+                <div className="q-ta">கடவுச்சீட்டு எண்</div>
+              </label>
+              <input
+                className="modern-input"
+                name="passportNo"
+                value={formData.passportNo}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="identity-input-card">
+              <label className="identity-label">
+                <div className="q-en">Nationality</div>
+                <div className="q-si">ජාතිකත්වය</div>
+                <div className="q-ta">தேசியம்</div>
+              </label>
+              <input
+                className="modern-input"
+                name="nationality"
+                value={formData.nationality}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+          <div className="identity-status-grid">
+            <div className="identity-card wide-card">
+              <div className="identity-card-title">Married / Unmarried / Separated / Divorced</div>
+              <div className="identity-card-meta">
+                <span className="q-si">විවාහිත / අවිවාහිත / වෙන්වූ / දික්කසාද</span>
+                <span className="q-ta">திருமணமான / திருமணமல்லாத / பிரிந்த / விவாகரத்து</span>
+              </div>
+              <div className="qual-opts">
+                {[
+                  ["Married", "විවාහිත", "திருமணமான"],
+                  ["Unmarried", "අවිවාහිත", "திருமணமல்லாத"],
+                  ["Separated", "වෙන්වූ", "பிரிந்த"],
+                  ["Divorced", "දික්කසාද", "விவாகරத්து"],
+                ].map(([en, si, ta]) => (
+                  <label key={en} className="qual-card">
+                    <input
+                      type="radio"
+                      name="maritalStatus"
+                      checked={formData.maritalStatus === en}
+                      onChange={() => setFormData(p => ({ ...p, maritalStatus: en }))}
+                    />
+                    <div className="qual-card-content">
+                      <div className="q-en">{en}</div>
+                      <div className="q-si">{si}</div>
+                      <div className="q-ta">{ta}</div>
+                    </div>
                   </label>
                 ))}
               </div>
-
-              <div className="addr-block">
-                <div className="addr-lbl"><div className="q-en">Permanent Address</div><div className="q-si">ස්ථිර ලිපිනය</div><div className="q-ta">நிரந்தர முகவரி</div></div>
-                <textarea className="auto-textarea" name="permanentAddress" value={formData.permanentAddress} onChange={e=>{handleChange(e);autoGrow(e);}} rows={2} placeholder="Enter permanent address..." />
+            </div>
+            <div className="identity-card wide-card">
+              <div className="identity-card-title">Gender</div>
+              <div className="identity-card-meta">
+                <span className="q-si">පුරුෂ / ස්ත්‍රී / වෙනත්</span>
+                <span className="q-ta">பாலினம்</span>
               </div>
-
-              <div className="addr-block">
-                <div className="addr-lbl"><div className="q-en">Mailing Address</div><div className="q-si">තැපැල් ලිපිනය</div><div className="q-ta">அஞ்சல் முகவரி</div></div>
-                <textarea className="auto-textarea" name="mailingAddress" value={formData.mailingAddress} onChange={e=>{handleChange(e);autoGrow(e);}} rows={2} placeholder="Enter mailing address..." />
-              </div>
-
-              <div className="duration-row">
-                <div className="dur-lbl"><div className="q-en">Duration at above</div><div className="q-si">ඉහත ලිපිනයේ කාලය</div><div className="q-ta">மேலுள்ள முகவரியில் காலம்</div></div>
-                <div className="dur-pair">
-                  <span className="dur-unit"><div className="q-en">Years</div><div className="q-si">අවුරුදු</div><div className="q-ta">வருடம்</div></span>
-                  <input className="small-box" name="yearsAtAbove" value={formData.yearsAtAbove} onChange={handleChange} />
-                </div>
-                <div className="dur-pair">
-                  <span className="dur-unit"><div className="q-en">Months</div><div className="q-si">මාස</div><div className="q-ta">மாதம்</div></span>
-                  <input className="small-box" name="monthsAtAbove" value={formData.monthsAtAbove} onChange={handleChange} />
-                </div>
-              </div>
-
-              <div className="contact-label-block"><div className="q-en">Contact No</div><div className="q-si">දුරකථන අංකය</div><div className="q-ta">தொடர்பு இலக்கம்</div></div>
-              <div className="contact-2col">
-                <div className="contact-col">
-                  {[["Home","නිවස","வீடு","homeContact",homeBoxes],["Fax","ෆැක්ස්","தொலைநகல்","fax",faxBoxes]].map(([lbl,si,ta,name,boxes]) => (
-                    <div key={name} className="boxed-row">
-                      <div className="box-lbl"><div className="q-en">{lbl}</div><div className="q-si">{si}</div><div className="q-ta">{ta}</div></div>
-                      <div className="char-wrap">
-                        <div className="char-boxes">{boxes.map((c,i) => <span key={i} className="char-box">{c}</span>)}</div>
-                        <input type="text" className="overlay-input" name={name} value={formData[name]} onChange={handleChange} />
-                      </div>
+              <div className="qual-opts">
+                {[
+                  ["Male", "පුරුෂ", "ஆண்"],
+                  ["Female", "ස්ත්‍රී", "பெண්"],
+                  ["Other", "වෙනත්", "மற்றவை"],
+                ].map(([en, si, ta]) => (
+                  <label key={en} className="qual-card">
+                    <input
+                      type="radio"
+                      name="gender"
+                      checked={formData.gender === en}
+                      onChange={() => setFormData(p => ({ ...p, gender: en }))}
+                    />
+                    <div className="qual-card-content">
+                      <div className="q-en">{en}</div>
+                      <div className="q-si">{si}</div>
+                      <div className="q-ta">{ta}</div>
                     </div>
-                  ))}
-                  <div className="boxed-row email-row">
-                    <div className="box-lbl"><div className="q-en">Email</div><div className="q-si">විද්‍යුත් ලිපිනය</div><div className="q-ta">மின்னஞ்சல்</div></div>
-                    <input className="line-input" name="email" value={formData.email} onChange={handleChange} />
-                  </div>
-                </div>
-                <div className="contact-col">
-                  {[["Office","කාර්යාලය","அலுவலகம்","officeContact",officeBoxes],["Mob -1","ජංගම 1","கையடக்கி 1","mobile1",mobile1Boxes],["Mob -2","ජංගම 2","கையடக்கி 2","mobile2",mobile2Boxes]].map(([lbl,si,ta,name,boxes]) => (
-                    <div key={name} className="boxed-row">
-                      <div className="box-lbl"><div className="q-en">{lbl}</div><div className="q-si">{si}</div><div className="q-ta">{ta}</div></div>
-                      <div className="char-wrap">
-                        <div className="char-boxes">{boxes.map((c,i) => <span key={i} className="char-box">{c}</span>)}</div>
-                        <input type="text" className="overlay-input" name={name} value={formData[name]} onChange={handleChange} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                  </label>
+                ))}
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* 3–8 Identity Grid */}
-        <section className="paper-section">
-          <div className="identity-grid">
-            <div className="id-item">
-              <div className="id-lbl"><span className="q-num">3).</span><div><div className="q-en">NIC No</div><div className="q-si">ජා.හැ.අංකය</div><div className="q-ta">தே.அ.அ எண்</div></div></div>
-              <div className="char-wrap id-boxes">
-                <div className="char-boxes">{nicBoxes.map((c,i)=><span key={i} className="char-box">{c}</span>)}</div>
-                <input className="overlay-input full-overlay" name="nicNo" value={formData.nicNo} onChange={handleChange} />
-              </div>
-            </div>
-            <div className="id-item">
-              <div className="id-lbl"><span className="q-num">6).</span><div><div className="q-en">Date of Birth</div><div className="q-si">උපන් දිනය</div><div className="q-ta">பிறந்த தேதி</div></div></div>
-              <div className="char-wrap id-boxes">
-                <div className="char-boxes dob-boxes">{dobBoxes.map((c,i)=><span key={i} className="char-box">{c}</span>)}</div>
-                <input className="overlay-input full-overlay" name="dateOfBirth" value={formData.dateOfBirth} onChange={handleChange} placeholder="YYYYMMDD" />
-              </div>
-            </div>
-            <div className="id-item">
-              <div className="id-lbl"><span className="q-num">4).</span><div><div className="q-en">Passport No</div><div className="q-si">විදේශ ගමන් බලපත්‍ර අංකය</div><div className="q-ta">கடவுச்சீட்டு எண்</div></div></div>
-              <div className="char-wrap id-boxes">
-                <div className="char-boxes">{passportBoxes.map((c,i)=><span key={i} className="char-box">{c}</span>)}</div>
-                <input className="overlay-input full-overlay" name="passportNo" value={formData.passportNo} onChange={handleChange} />
-              </div>
-            </div>
-            <div className="id-item">
-              <div className="id-lbl"><span className="q-num">7).</span><div><div className="q-en">Nationality</div><div className="q-si">ජාතිකත්වය</div><div className="q-ta">தேசியம்</div></div></div>
-              <input className="line-input" name="nationality" value={formData.nationality} onChange={handleChange} />
-            </div>
-            <div className="id-item">
-              <div className="id-lbl"><span className="q-num">5).</span><div><div className="q-en">Married / Unmarried / separate / divorce</div><div className="q-si">විවාහක / අවිවාහක / වෙන් වූ / දික්කසාද</div><div className="q-ta">திருமணமானவர் / திருமணமாகாதவர் / தனிமை / விவாகரத்து</div></div></div>
-              <input className="line-input" name="maritalStatus" value={formData.maritalStatus} onChange={handleChange} />
-            </div>
-            <div className="id-item">
-              <div className="id-lbl"><span className="q-num">8).</span><div><div className="q-en">Gender</div><div className="q-si">ස්ත්‍රී / පුරුෂ භාවය</div><div className="q-ta">பால்</div></div></div>
-              <input className="line-input" name="gender" value={formData.gender} onChange={handleChange} />
             </div>
           </div>
         </section>
 
         {/* 9. Family Members */}
-        <section className="paper-section">
-          <div className="sec-head"><span className="q-num">9).</span><span className="q-en">Details of Family Members</span><span className="q-si">පවුලේ සාමාජිකයින්ගේ විස්තර</span><span className="q-ta">குடும்ப உறுப்பினர் விவரம்</span></div>
-          <table className="paper-table family-table">
-            <thead><tr>
-              <th><div>Member</div><div className="th-si">සාමාජිකයා</div><div className="th-ta">உறுப்பினர்</div></th>
-              <th><div>Name</div><div className="th-si">නම</div><div className="th-ta">பெயர்</div></th>
-              <th><div>Contact Number (Prefer land line)</div><div className="th-si">දුරකථන අංකය (දේශීය දුරකථනයකට කැමැත්ත)</div><div className="th-ta">தொடர்பு எண் (நிலைத்தட வரிசை விரும்பப்படுகிறது)</div></th>
-            </tr></thead>
-            <tbody>
-              {formData.familyMembers.map((row,i) => (
-                <tr key={row.member}>
-                  <td className="member-cell"><div className="q-en-b">{row.member}</div><div className="th-si">{row.memberSi}</div><div className="th-ta">{row.memberTa}</div></td>
-                  <td><input value={row.name} onChange={e=>tableChange("familyMembers",i,"name",e.target.value)} /></td>
-                  <td><input value={row.contact} onChange={e=>tableChange("familyMembers",i,"contact",e.target.value)} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="children-row">
-            <div className="chi-field"><label><div className="q-en">No of Children</div><div className="q-si">ළමුන් ගණන</div><div className="q-ta">குழந்தைகள் எண்ணிக்கை</div></label><input className="small-box" name="noOfChildren" value={formData.noOfChildren} onChange={handleChange} /></div>
-            <div className="chi-field"><label><div className="q-en">Age:</div><div className="q-si">වයස</div></label><input className="small-box" name="childAge1" value={formData.childAge1} onChange={handleChange} /><span className="q-en">Yrs<br/><span className="q-si">අවු.</span></span></div>
-            <div className="chi-field"><input className="small-box" name="childAge2" value={formData.childAge2} onChange={handleChange} /><span className="q-en">Yrs<br/><span className="q-si">අවු.</span></span></div>
-            <div className="chi-field"><input className="small-box" name="childAge3" value={formData.childAge3} onChange={handleChange} /><span className="q-en">Yrs<br/><span className="q-si">අවු.</span></span></div>
-            <div className="chi-field"><label><div className="q-en">Total Dependants</div><div className="q-si">සමස්ත යැපෙන්නන්</div><div className="q-ta">சார்ந்தவர்கள் எண்ணிக்கை</div></label><input className="small-box" name="totalDependants" value={formData.totalDependants} onChange={handleChange} /></div>
+        <section className="paper-section family-section">
+                  <div className="section-head family-head">
+                              <span className="q-num">9).</span>
+                                          <div>
+                                                        <div className="q-en">Details of Family Members</div>
+                                                                      <div className="q-si">පවුලේ සාමාජිකයන්ගේ විස්තර</div>
+                                                                                    <div className="q-ta">குடும்ப உறுப்பினர்களின் விவரங்கள்</div>
+                                                                                                </div>
+                                                                                                          </div>
+                                                                                                          
+          <div className="family-card">
+                      <div className="table-wrap guarantor-wrap">
+                                    <table className="paper-table guarantor-table">
+                                                    <thead>
+                                                                      <tr>
+                                                                                          <th style={{width:"6%"}}>No</th>
+                                                                                          <th><div>Member</div><div className="th-si">සාමාජිකයා</div><div className="th-ta">குடும்ப உறுப்பினர்</div></th>
+                                                                                                              <th><div>Name</div><div className="th-si">නම</div><div className="th-ta">பெயர்</div></th>
+                                                                                                                                  <th><div>Contact Number (Prefer land line)</div><div className="th-si">දුරකථන අංකය (නිවසේ දුරකථන අංකයට වැඩි ප්‍රමුඛතාවයක් දෙන්න)</div><div className="th-ta">தொடர்பு இலக்கம் (வீட்டு தொலைபேசி எண்ணுக்கு முன்னுரிமை கொடுங்கள்)</div></th>
+                                                                                                                                                    </tr>
+                                                                                                                                                                    </thead>
+                                                                                                                                                                                    <tbody>
+                                                                                                                                                                                                      {formData.familyMembers.map((row, i) => (
+                                                                                                                                                                                                                          <tr key={row.member} className="guarantor-row">
+                                                                                                                                                                                                                                                <td className="g-num">
+                                                                                                                                                                                                                                                  <span>{i+1}</span>
+                                                                                                                                                                                                                                                </td>
+                                                                                                                                                                                                                                                <td className="member-cell"><div className="q-en-b">{row.member}</div><div className="th-si">{row.memberSi}</div><div className="th-ta">{row.memberTa}</div></td>
+                                                                                                                                                                                                                                                                      <td><input className="table-input" value={row.name} onChange={e => tableChange("familyMembers", i, "name", e.target.value)} /></td>
+                                                                                                                                                                                                                                                                                            <td><input className="table-input" value={row.contact} onChange={e => tableChange("familyMembers", i, "contact", e.target.value)} />
+                                                                                                                                                                                                                {errors[`familyMembers.${i}.contact`] && <span className="error-text">{errors[`familyMembers.${i}.contact`]}</span>}
+                                                                                                                                                                                                                </td>
+                                                                                                                                                                                                                                                                                                                </tr>
+                                                                                                                                                                                                                                                                                                                                  ))}
+                                                                                                                                                                                                                                                                                                                                                  </tbody>
+                                                                                                                                                                                                                                                                                                                                                                </table>
+                                                                                                                                                                                                                                                                                                                                                                            </div>
+                                                                                                                                                                                                                                                                                                                                                                                      </div>
+                                                                                                                      
+          {/* Mobile Cards for Family Members */}
+          <div className="mobile-table-cards">
+            {formData.familyMembers.map((row, i) => (
+              <div key={row.member} className="mobile-table-card">
+                <div className="card-header">
+                  {i+1}. {row.member}
+                </div>
+                <div className="field-row">
+                  <label>
+                    <div className="q-en">Name</div>
+                    <div className="q-si">නම</div>
+                    <div className="q-ta">பெயர்</div>
+                  </label>
+                  <input 
+                    className="table-input" 
+                    value={row.name} 
+                    onChange={e => tableChange("familyMembers", i, "name", e.target.value)} 
+                  />
+                </div>
+                <div className="field-row">
+                  <label>
+                    <div className="q-en">Contact Number (Prefer land line)</div>
+                    <div className="q-si">දුරකථන අංකය (නිවසේ දුරකථන අංකයට වැඩි ප්‍රමුඛතාවයක් දෙන්න)</div>
+                    <div className="q-ta">தொடர்பு இலக்கம் (வீட்டு தொலைபேசி எண்ணுக்கு முன்னுரிமை கொடுங்கள்)</div>
+                  </label>
+                  <input 
+                    className="table-input" 
+                    value={row.contact} 
+                    onChange={e => tableChange("familyMembers", i, "contact", e.target.value)} 
+                  />
+                  {errors[`familyMembers.${i}.contact`] && <span className="error-text">{errors[`familyMembers.${i}.contact`]}</span>}
+                </div>
+              </div>
+            ))}
           </div>
-        </section>
-
+          <div className="children-card">
+            <div className="children-head">
+              <div className="q-en">Children Details</div>
+              <div className="q-si">ළමයින් විස්තර</div>
+              <div className="q-ta">குழந்தைகள் விவரம்</div>
+            </div>
+            <div className="children-content">
+                                                                          <div className="field-group">
+                                                                                          <label className="field-label">
+                                                                                                            <div className="q-en">No of Children</div>
+                                                                                                                              <div className="q-si">ළමයින් ගණන</div>
+                                                                                                                                                <div className="q-ta">குழந்தைகள் எண்ணிக்கை</div>
+                                                                                                                                                                </label>
+                                                                                                                                                                                <input
+                                                                                                                                                                                  type="text"
+                                                                                                                                                                                  inputMode="numeric"
+                                                                                                                                                                                  pattern="[0-9]*"
+                                                                                                                                                                                  className="styled-input"
+                                                                                                                                                                                  name="noOfChildren"
+                                                                                                                                                                                  value={formData.noOfChildren}
+                                                                                                                                                                                  onChange={handleChange}
+                                                                                                                                                                                />
+                                                                                                                                                                                {errors.noOfChildren && <span className="error-text">{errors.noOfChildren}</span>}
+                                                                                                                                                                                              </div>
+                                                                                                                                                                                              
+              <div className="child-ages-row">
+                              <div className="child-age-box">
+                                                <label className="field-label">
+                                                                    <div className="q-en">Age</div>
+                                                                                        <div className="q-si">වයස</div>
+                                                                                                            <div className="q-ta">வயது</div>
+                                                                                                                              </label>
+                                                                                                                                                <input
+                                                                                                                                                  type="text"
+                                                                                                                                                  inputMode="numeric"
+                                                                                                                                                  pattern="[0-9]*"
+                                                                                                                                                  className="styled-input child-age-input"
+                                                                                                                                                  name="childAge1"
+                                                                                                                                                  value={formData.childAge1}
+                                                                                                                                                  onChange={handleChange}
+                                                                                                                                                />
+                                                                                                                                                {errors.childAge1 && <span className="error-text">{errors.childAge1}</span>}
+                                                                                                                                                                  <span className="age-suffix"><span className="q-en">Yrs</span><span className="q-si">අවුරුදු</span><span className="q-ta">ஆண்டுகள்</span></span>
+                                                                                                                                                                                  </div>
+                                                                                                                                                                                                  <div className="child-age-box">
+                                                                                                                                                                                                                    <label className="field-label" aria-hidden="true">
+                                                                                                                                                                                                                                      <div className="q-en">Age</div>
+                                                                                                                                                                                                                                      <div className="q-si">වයස</div>
+                                                                                                                                                                                                                                      <div className="q-ta">வயது</div>
+                                                                                                                                                                                                                    </label>
+                                                                                                                                                                                                                    <input
+                                                                                                                                                                                                                      type="text"
+                                                                                                                                                                                                                      inputMode="numeric"
+                                                                                                                                                                                                                      pattern="[0-9]*"
+                                                                                                                                                                                                                      className="styled-input child-age-input"
+                                                                                                                                                                                                                      name="childAge2"
+                                                                                                                                                                                                                      value={formData.childAge2}
+                                                                                                                                                                                                                      onChange={handleChange}
+                                                                                                                                                                                                                    />
+                                                                                                                                                                                                                    {errors.childAge2 && <span className="error-text">{errors.childAge2}</span>}
+                                                                                                                                                                                                                                      <span className="age-suffix"><span className="q-en">Yrs</span><span className="q-si">අවුරුදු</span><span className="q-ta">ஆண்டுகள்</span></span>
+                                                                                                                                                                                                                                                      </div>
+                                                                                                                                                                                                                                                                      <div className="child-age-box">
+                                                                                                                                                                                                                                                                                        <label className="field-label" aria-hidden="true">
+                                                                                                                                                                                                                                                                                          <div className="q-en">Age</div>
+                                                                                                                                                                                                                                                                                          <div className="q-si">වයස</div>
+                                                                                                                                                                                                                                                                                          <div className="q-ta">வயது</div>
+                                                                                                                                                                                                                                                                                        </label>
+                                                                                                                                                                                                                                                                                        <input
+                                                                                                                                                                                                                                                                                          type="text"
+                                                                                                                                                                                                                                                                                          inputMode="numeric"
+                                                                                                                                                                                                                                                                                          pattern="[0-9]*"
+                                                                                                                                                                                                                                                                                          className="styled-input child-age-input"
+                                                                                                                                                                                                                                                                                          name="childAge3"
+                                                                                                                                                                                                                                                                                          value={formData.childAge3}
+                                                                                                                                                                                                                                                                                          onChange={handleChange}
+                                                                                                                                                                                                                                                                                        />
+                                                                                                                                                                                                                                                                                        {errors.childAge3 && <span className="error-text">{errors.childAge3}</span>}
+                                                                                                                                                                                                                                                                                                          <span className="age-suffix"><span className="q-en">Yrs</span><span className="q-si">අවුරුදු</span><span className="q-ta">ஆண்டுகள்</span></span>
+                                                                                                                                                                                                                                                                                                                          </div>
+                                                                                                                                                                                                                                                                                                                                        </div>
+                                                                                                                                                                                                                                                                                                                                        
+              <div className="field-group total-group">
+                              <label className="field-label">
+                                                <div className="q-en">Total Dependants</div>
+                                                                  <div className="q-si">මුළු යැපෙන්නන්</div>
+                                                                                    <div className="q-ta">மொத்த சார்ந்திருப்பவர்கள்</div>
+                                                                                                    </label>
+                                                                                                                    <input
+                                                                                                                      type="text"
+                                                                                                                      inputMode="numeric"
+                                                                                                                      pattern="[0-9]*"
+                                                                                                                      className="styled-input"
+                                                                                                                      name="totalDependants"
+                                                                                                                      value={formData.totalDependants}
+                                                                                                                      onChange={handleChange}
+                                                                                                                    />
+                                                                                                                    {errors.totalDependants && <span className="error-text">{errors.totalDependants}</span>}
+                                                                                                                                  </div>
+                                                                                                                                              </div>
+                                                                                                                                                        </div>
+                                                                                                                                                                </section>
         {/* 10. Qualifications */}
         <section className="paper-section">
           <div className="qual-row">
-            <div className="qual-lbl"><span className="q-num">10).</span><div><div className="q-en">Qualifications</div><div className="q-si">සුදුසුකම්</div><div className="q-ta">தகுதிகள்</div></div></div>
+            <div className="qual-lbl"><span className="q-num">10).</span><div><div className="q-en">Qualifications</div><div className="q-si">අධ්‍යාපනික සුදුසුකම්</div><div className="q-ta">கல்வித் தகுதிகள்</div></div></div>
             <div className="qual-opts">
-              {[["Primary","ප්‍රාථමික","ஆரம்பநிலை"],["Secondary","ද්විතීයික","இடைநிலை"],["Graduate","උපාධිධාරී","பட்டதாரி"],["Post Graduate","පශ්චාත් උපාධිය","முதுகலை"],["Professional","වෘත්තීය","தொழில்முறை"]].map(([en,si,ta])=>(
-                <label key={en} className="qual-item">
+              {[["Primary","ප්‍රාථමික","ஆரம்ப"],["Secondary","ද්විතීයික","இடைநிலை"],["Graduate","උපාධිධාරී","பட்டதாரி"],["Post Graduate","පශ්චාත් උපාධිධාරී","பட்டப்படிப்பு முடிந்தவர்"],["Professional","වෘත්තීය","தொழில்முறை"]].map(([en,si,ta])=>(
+                <label key={en} className="qual-card">
                   <input type="checkbox" checked={formData.qualifications.includes(en)} onChange={()=>handleQualificationChange(en)} />
-                  <div><div className="q-en">{en}</div><div className="q-si">{si}</div><div className="q-ta">{ta}</div></div>
+                  <div className="qual-card-content">
+                    <div className="q-en">{en}</div>
+                    <div className="q-si">{si}</div>
+                    <div className="q-ta">{ta}</div>
+                  </div>
                 </label>
               ))}
+            </div>
+            <div className="other-qual-field">
+              <label className="other-qual-label">
+                <div className="q-en">Other Qualification</div>
+                <div className="q-si">වෙනත් අධ්‍යාපනික සුදුසුකම්</div>
+                <div className="q-ta">பிற கல்வித் தகுதி</div>
+              </label>
+              <input
+                type="text"
+                className="other-qual-input"
+                value={formData.otherQualification}
+                onChange={handleChange}
+                name="otherQualification"
+                placeholder="Enter custom qualification"
+              />
             </div>
           </div>
         </section>
 
         {/* 11. Bank Details */}
         <section className="paper-section">
-          <div className="sec-head"><span className="q-num">11).</span><span className="q-en">Bank Details</span><span className="q-si">බැංකු විස්තර</span><span className="q-ta">வங்கி விபரம்</span></div>
-          <table className="paper-table bank-table">
+          <div className="sec-head"><span className="q-num">11).</span><span className="q-en">Bank Details</span><span className="q-si">බැංකු විස්තර</span><span className="q-ta">வங்கி விவரங்கள்</span></div>
+          <div className="table-wrap guarantor-wrap">
+            <table className="paper-table guarantor-table">
             <thead><tr>
+              <th style={{width:"6%"}}>No</th>
               <th><div>Bank</div><div className="th-si">බැංකුව</div><div className="th-ta">வங்கி</div></th>
               <th><div>Branch</div><div className="th-si">ශාඛාව</div><div className="th-ta">கிளை</div></th>
               <th><div>Account No</div><div className="th-si">ගිණුම් අංකය</div><div className="th-ta">கணக்கு எண்</div></th>
               <th><div>Officer</div><div className="th-si">නිලධාරියා</div><div className="th-ta">அதிகாரி</div></th>
-              <th><div>Telephone</div><div className="th-si">දුරකථනය</div><div className="th-ta">தொலைபேசி</div></th>
+              <th><div>Telephone</div><div className="th-si">දුරකතනය</div><div className="th-ta">தொலைபேசி</div></th>
             </tr></thead>
-            <tbody>{formData.bankDetails.map((r,i)=><tr key={i}><td><input value={r.bank} onChange={e=>tableChange("bankDetails",i,"bank",e.target.value)} /></td><td><input value={r.branch} onChange={e=>tableChange("bankDetails",i,"branch",e.target.value)} /></td><td><input value={r.accountNo} onChange={e=>tableChange("bankDetails",i,"accountNo",e.target.value)} /></td><td><input value={r.officer} onChange={e=>tableChange("bankDetails",i,"officer",e.target.value)} /></td><td className="td-with-del"><input value={r.telephone} onChange={e=>tableChange("bankDetails",i,"telephone",e.target.value)} />{i>=3&&<button type="button" className="del-row-btn" onClick={()=>removeRow("bankDetails",i)}>✕</button>}</td></tr>)}</tbody>
-          </table>
+            <tbody>{formData.bankDetails.map((r,i)=><tr key={i} className="guarantor-row">
+                <td className="g-num">
+                  <span>{i+1}</span>
+                  {i>=3 && (
+                    <button type="button" className="del-row-btn del-small" onClick={()=>removeRow("bankDetails",i)}>✕</button>
+                  )}
+                </td>
+                <td>
+                  <select
+                    className="bank-select"
+                    value={r.bank || ""}
+                    onChange={e=>handleBankChange(i, e.target.value)}
+                  >
+                    <option value="" disabled>Select Bank</option>
+                    {BANK_NAMES.map((name)=><option key={name} value={name}>{name}</option>)}
+                  </select>
+                </td>
+                <td><input value={r.branch} onChange={e=>tableChange("bankDetails",i,"branch",e.target.value)} /></td>
+                <td>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={r.accountNo || ""}
+                    onChange={(e) =>
+                      handleBankFieldChange(i, "accountNo", e.target.value)
+                    }
+                  />
+                  {errors[`accountNo_${i}`] && (
+                    <span className="error-text">
+                      {errors[`accountNo_${i}`]}
+                    </span>
+                  )}
+                </td>
+                <td><input value={r.officer} onChange={e=>tableChange("bankDetails",i,"officer",e.target.value)} /></td>
+                <td>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={r.telephone || ""}
+                    onChange={(e) =>
+                      handleBankFieldChange(i, "telephone", e.target.value)
+                    }
+                  />
+                  {errors[`telephone_${i}`] && (
+                    <span className="error-text">
+                      {errors[`telephone_${i}`]}
+                    </span>
+                  )}
+                </td>
+              </tr>)}</tbody>
+            </table>
+          </div>
           <button type="button" className="add-row-btn" onClick={()=>addRow("bankDetails",emptyBankRow)}>+ Add Row</button>
         </section>
 
         {/* 12. Credit Facilities */}
         <section className="paper-section">
           <div className="sec-head"><span className="q-num">12).</span><span className="q-en">Details Of Credit Facilities Obtained From Abans Finance PLC &amp; Other Financial Institutions</span></div>
-          <div className="q-si" style={{fontSize:10,marginBottom:4}}>අබාන්ස් ෆිනෑන්ස් පීඑල්සී සහ වෙනත් මූල්‍ය ආයතනවලින් ලබාගත් ණය පහසුකම් විස්තර</div>
-          <div className="q-ta" style={{fontSize:10,marginBottom:6}}>Abans Finance ஐயிருந்தும் மற்ற நிதி நிறுவனங்களிலிருந்தும் பெறப்பட்ட கடன் வசதி விவரங்கள்</div>
-          <table className="paper-table credit-table">
+          <div className="q-si" style={{fontSize:10,marginBottom:4}}>අබාන්ස් ෆයිනෑන්ස් පීඑල්සී සහ වෙනත් මූල්‍ය ආයතන වලින් ලබාගත් ණය සහ ලීසිං පහසුකම් විස්තර</div>
+          <div className="q-ta" style={{fontSize:10,marginBottom:6}}>Abans Finance PLC மற்றும் பிற நிதி நிறுவனங்களில் இருந்து பெறப்பட்ட கடன் மற்றும் குத்தகை வசதிகளின் விவரங்கள்</div>
+          <div className="table-wrap guarantor-wrap">
+            <table className="paper-table guarantor-table">
             <thead><tr>
+              <th style={{width:"6%"}}>No</th>
               <th><div>Name of Institution</div><div className="th-si">ආයතනයේ නම</div><div className="th-ta">நிறுவனத்தின் பெயர்</div></th>
               <th><div>Type</div><div className="th-si">වර්ගය</div><div className="th-ta">வகை</div></th>
-              <th><div>Approved Amount</div><div className="th-si">අනුමත මුදල</div><div className="th-ta">அங்கீகரிக்கப்பட்ட தொகை</div></th>
+              <th><div>Approved Amount</div><div className="th-si">අනුමත මුදල් ප්‍රමාණය</div><div className="th-ta">அங்கீகரிக்கப்பட்ட தொகை</div></th>
               <th><div>Term</div><div className="th-si">කාලය</div><div className="th-ta">காலம்</div></th>
-              <th><div>Monthly Repayment</div><div className="th-si">මාසික ගෙවීම</div><div className="th-ta">மாத தவணை</div></th>
-              <th><div>Present O/S</div><div className="th-si">වත්මන් ශේෂය</div><div className="th-ta">தற்போதைய நிலுவை</div></th>
-              <th><div>Security</div><div className="th-si">ආරක්ෂාව</div><div className="th-ta">பாதுகாப்பு</div></th>
+              <th><div>Monthly Repayment</div><div className="th-si">මාසික ගෙවීම්</div><div className="th-ta">மாதாந்திர தவணை</div></th>
+              <th><div>Present O/S</div><div className="th-si">වර්තමාන බාර</div><div className="th-ta">தற்போதைய நிலுவை</div></th>
+              <th><div>Security</div><div className="th-si">උරුමය</div><div className="th-ta">உத்தரவாதம்</div></th>
             </tr></thead>
-            <tbody>{formData.creditFacilities.map((r,i)=><tr key={i}><td><input value={r.institution} onChange={e=>tableChange("creditFacilities",i,"institution",e.target.value)} /></td><td><input value={r.type} onChange={e=>tableChange("creditFacilities",i,"type",e.target.value)} /></td><td><input value={r.approvedAmount} onChange={e=>tableChange("creditFacilities",i,"approvedAmount",e.target.value)} /></td><td><input value={r.term} onChange={e=>tableChange("creditFacilities",i,"term",e.target.value)} /></td><td><input value={r.monthlyRepayment} onChange={e=>tableChange("creditFacilities",i,"monthlyRepayment",e.target.value)} /></td><td><input value={r.presentOS} onChange={e=>tableChange("creditFacilities",i,"presentOS",e.target.value)} /></td><td className="td-with-del"><input value={r.security} onChange={e=>tableChange("creditFacilities",i,"security",e.target.value)} />{i>=3&&<button type="button" className="del-row-btn" onClick={()=>removeRow("creditFacilities",i)}>✕</button>}</td></tr>)}</tbody>
-          </table>
+            <tbody>{formData.creditFacilities.map((r,i)=><tr key={i} className="guarantor-row">
+                <td className="g-num">
+                  <span>{i+1}</span>
+                  {i>=3 && <button type="button" className="del-row-btn del-small" onClick={()=>removeRow("creditFacilities",i)}>✕</button>}
+                </td>
+                <td><input value={r.institution} onChange={e=>tableChange("creditFacilities",i,"institution",e.target.value)} /></td>
+                <td><input value={r.type} onChange={e=>tableChange("creditFacilities",i,"type",e.target.value)} /></td>
+                <td>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={r.approvedAmount || ""}
+                    onChange={(e) =>
+                      handleCreditFacilityFieldChange(i, "approvedAmount", e.target.value)
+                    }
+                  />
+                  {errors[`approvedAmount_${i}`] && (
+                    <span className="error-text">
+                      {errors[`approvedAmount_${i}`]}
+                    </span>
+                  )}
+                </td>
+                <td><input value={r.term} onChange={e=>tableChange("creditFacilities",i,"term",e.target.value)} /></td>
+                <td>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={r.monthlyRepayment || ""}
+                    onChange={(e) =>
+                      handleCreditFacilityFieldChange(i, "monthlyRepayment", e.target.value)
+                    }
+                  />
+                  {errors[`monthlyRepayment_${i}`] && (
+                    <span className="error-text">
+                      {errors[`monthlyRepayment_${i}`]}
+                    </span>
+                  )}
+                </td>
+                <td>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={r.presentOS}
+                    onChange={e=>tableChange("creditFacilities",i,"presentOS",e.target.value)}
+                  />
+                  {errors[`creditFacilities.${i}.presentOS`] && (
+                    <span className="error-text">{errors[`creditFacilities.${i}.presentOS`]}</span>
+                  )}
+                </td>
+                <td><input value={r.security} onChange={e=>tableChange("creditFacilities",i,"security",e.target.value)} /></td>
+              </tr>)}</tbody>
+            </table>
+          </div>
           <button type="button" className="add-row-btn" onClick={()=>addRow("creditFacilities",emptyCreditRow)}>+ Add Row</button>
         </section>
 
         {/* 13. Non-Related Referees */}
         <section className="paper-section">
-          <div className="sec-head"><span className="q-num">13).</span><span className="q-en">Non Related Referees</span><span className="q-si">ඥාතීන් නොවන විශ්වාසනීය පුද්ගලයන්</span><span className="q-ta">உறவினர் அல்லாத சிபாரிசர்கள்</span></div>
+          <div className="sec-head"><span className="q-num">13).</span><span className="q-en">Non Related Referees</span><span className="q-si">නොසම්බන්ධිත යෝජකයින්</span><span className="q-ta">தொடர்பில்லாத பரிந்துரையாளர்கள்</span></div>
           <div className="referees-grid">
-            {[{n:"reference1Name",p:"reference1Profession",c:"reference1Contact",num:"1"},{n:"reference2Name",p:"reference2Profession",c:"reference2Contact",num:"2"}].map(({n,p,c,num})=>(
+            {[
+              {n:"reference1Name",p:"reference1Profession",c:"reference1Contact",num:"1", title:"Referee 1"},
+              {n:"reference2Name",p:"reference2Profession",c:"reference2Contact",num:"2", title:"Referee 2"}
+            ].map(({n,p,c,num,title})=>(
               <div key={num} className="referee-card">
-                <div className="ref-row"><div className="ref-lbl"><strong>{num}. Name :</strong><br/><span className="q-si">නම</span> / <span className="q-ta">பெயர்</span></div><input className="line-input" name={n} value={formData[n]} onChange={handleChange} /></div>
-                <div className="ref-row"><div className="ref-lbl"><strong>Profession :</strong><br/><span className="q-si">රැකියාව</span> / <span className="q-ta">தொழில்</span></div><input className="line-input" name={p} value={formData[p]} onChange={handleChange} /></div>
-                <div className="ref-row"><div className="ref-lbl"><strong>Contact Number :</strong><br/><span className="q-si">දුරකථන අංකය</span> / <span className="q-ta">தொடர்பு எண்</span></div><input className="line-input" name={c} value={formData[c]} onChange={handleChange} /></div>
+                <div className="referee-header">
+                  <div className="referee-icon">👤</div>
+                  <div className="referee-title">{title}</div>
+                </div>
+                <div className="referee-fields">
+                  <div className="ref-field">
+                    <label className="ref-label">
+                      <div className="q-en">Name</div>
+                      <div className="q-si">නම</div>
+                      <div className="q-ta">பெயர்</div>
+                    </label>
+                    <input
+                      type="text"
+                      className="ref-input"
+                      name={n}
+                      value={formData[n]}
+                      onChange={handleChange}
+                      placeholder="Enter name"
+                    />
+                  </div>
+                  <div className="ref-field">
+                    <label className="ref-label">
+                      <div className="q-en">Profession</div>
+                      <div className="q-si">වෘත්තිය</div>
+                      <div className="q-ta">தொழில்</div>
+                    </label>
+                    <input
+                      type="text"
+                      className="ref-input"
+                      name={p}
+                      value={formData[p]}
+                      onChange={handleChange}
+                      placeholder="Enter profession"
+                    />
+                  </div>
+                  <div className="ref-field">
+                    <label className="ref-label">
+                      <div className="q-en">Contact Number</div>
+                      <div className="q-si">දුරකතා අංකය</div>
+                      <div className="q-ta">தொடர்பு இலக்கம்</div>
+                    </label>
+                    <input
+                      type="tel"
+                      className="ref-input"
+                      name={c}
+                      value={formData[c]}
+                      onChange={handleChange}
+                      placeholder="Enter contact number"
+                    />
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -473,181 +1233,906 @@ const handleSubmit = async (e) => {
 
         {/* 14. Employer/Business */}
         <section className="paper-section">
-          <div className="s14-grid">
-            <div className="s14-lbl"><span className="q-num">14).</span><div><div className="q-en">Employer/Business Name and Address</div><div className="q-si">සේවායෝජකයාගේ / ව්‍යාපාරයේ නම සහ ලිපිනය</div><div className="q-ta">நியோஜகர் / வணிகத்தின் பெயர் மற்றும் முகவரி</div></div></div>
-            <div className="s14-ans"><textarea className="auto-textarea" name="employerBusinessName" value={formData.employerBusinessName} onChange={e=>{handleChange(e);autoGrow(e);}} rows={1} placeholder="Name..." /><textarea className="auto-textarea" name="employerBusinessAddress" value={formData.employerBusinessAddress} onChange={e=>{handleChange(e);autoGrow(e);}} rows={1} placeholder="Address..." /></div>
-
-            <div className="s14-lbl"><div className="q-en">Nature of Business</div><div className="q-si">ව්‍යාපාරයේ ස්වභාවය</div><div className="q-ta">வணிகத்தின் தன்மை</div></div>
-            <div className="s14-ans"><input className="line-input" name="natureOfBusiness" value={formData.natureOfBusiness} onChange={handleChange} /></div>
-
-            <div className="s14-lbl"><div className="q-en">Your Designation / Profession</div><div className="q-si">ඔබගේ තනතුර / රැකියාව</div><div className="q-ta">பதவி / தொழில்</div></div>
-            <div className="s14-ans"><input className="line-input" name="designationProfession" value={formData.designationProfession} onChange={handleChange} /></div>
-
-            <div className="s14-lbl"><div className="q-en">Reference</div><div className="q-si">යොමුකිරීම</div><div className="q-ta">குறிப்பு</div></div>
-            <div className="s14-ans">
-              <div className="ref-split">
-                <div><div className="q-en" style={{fontSize:11}}>Telephone <span className="q-si">දුරකථනය</span> <span className="q-ta">தொலைபேசி இல</span></div><input className="line-input" name="telephone" value={formData.telephone} onChange={handleChange} /></div>
-                <div><div className="q-en" style={{fontSize:11}}>Designation <span className="q-si">තනතුර</span> <span className="q-ta">பதவி</span></div><input className="line-input" name="designation" value={formData.designation} onChange={handleChange} /></div>
+          <div className="sec-head">
+            <span className="q-num">14).</span>
+            <span className="q-en">Employer/Business Details</span>
+            <span className="q-si">රැකියාව / ව්‍යාපාර විස්තර</span>
+            <span className="q-ta">முதலாளி/வணிக விவரங்கள்</span>
+          </div>
+          <div className="employer-grid">
+            {/* Business Information Card */}
+            <div className="employer-card">
+              <div className="employer-header">
+                <div className="employer-icon">🏢</div>
+                <div className="employer-title">
+                  <div className="q-en">Business Information</div>
+                  <div className="q-si">ව්‍යාපාර තොරතුරු</div>
+                  <div className="q-ta">வணிக தகவல்</div>
+                </div>
+              </div>
+              <div className="employer-fields">
+                <div className="emp-field">
+                  <label className="emp-label">
+                    <div className="q-en">Employer/Business Name and Address</div>
+                    <div className="q-si">රැකියාව / ව්‍යාපාරයේ නම සහ ලිපිනය</div>
+                    <div className="q-ta">முதலாளி/வணிகத்தின் பெயர் மற்றும் முகவரி</div>
+                  </label>
+                  <div className="emp-address-group">
+                    <textarea
+                      className="emp-textarea"
+                      name="employerBusinessName"
+                      value={formData.employerBusinessName}
+                      onChange={e=>{handleChange(e);autoGrow(e);}}
+                      rows={1}
+                      placeholder="Name..."
+                    />
+                    <textarea
+                      className="emp-textarea"
+                      name="employerBusinessAddress"
+                      value={formData.employerBusinessAddress}
+                      onChange={e=>{handleChange(e);autoGrow(e);}}
+                      rows={1}
+                      placeholder="Address..."
+                    />
+                  </div>
+                </div>
+                <div className="emp-field">
+                  <label className="emp-label">
+                    <div className="q-en">Nature of Business</div>
+                    <div className="q-si">ව්‍යාපාරයේ ස්වභාවය</div>
+                    <div className="q-ta">வணிகத்தின் இயல்பு</div>
+                  </label>
+                  <input
+                    type="text"
+                    className="emp-input"
+                    name="natureOfBusiness"
+                    value={formData.natureOfBusiness}
+                    onChange={handleChange}
+                    placeholder="Enter nature of business"
+                  />
+                </div>
+                <div className="emp-field">
+                  <label className="emp-label">
+                    <div className="q-en">Your Designation / Profession</div>
+                    <div className="q-si">තනතුර / වෘත්තිය</div>
+                    <div className="q-ta">பதவி / தொழில்</div>
+                  </label>
+                  <input
+                    type="text"
+                    className="emp-input"
+                    name="designationProfession"
+                    value={formData.designationProfession}
+                    onChange={handleChange}
+                    placeholder="Enter designation/profession"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="s14-lbl"><div className="q-en">Main Income source</div><div className="q-si">ප්‍රධාන ආදායම් මාර්ගය</div><div className="q-ta">முக்கிய வருமான மூலம்</div></div>
-            <div className="s14-ans"><div className="q-en" style={{fontSize:11}}>Employment / Professional / business <span className="q-si">රැකියාව / වෘත්තිය / ව්‍යාපාරය</span> <span className="q-ta">வேலைவாய்ப்பு / தொழில் / வணிகம்</span></div><input className="line-input" name="employmentProfessionalBusiness" value={formData.employmentProfessionalBusiness} onChange={handleChange} /></div>
+            {/* Contact / Reference Details Card */}
+            <div className="employer-card">
+              <div className="employer-header">
+                <div className="employer-icon">📞</div>
+                <div className="employer-title">
+                  <div className="q-en">Contact / Reference Details</div>
+                  <div className="q-si">සම්බන්ධතා / යොමු විස්තර</div>
+                  <div className="q-ta">தொடர்பு / குறிப்பு விவரங்கள்</div>
+                </div>
+              </div>
+              <div className="employer-fields">
+                <div className="emp-field">
+                  <label className="emp-label">
+                    <div className="q-en">Reference</div>
+                    <div className="q-si">යොමුකරු</div>
+                    <div className="q-ta">குறிப்பு</div>
+                  </label>
+                  <div className="emp-ref-group">
+                    <div className="emp-ref-item">
+                      <label className="emp-ref-label">
+                        <div className="q-en">Telephone</div>
+                        <div className="q-si">දුරකථන අංකය</div>
+                        <div className="q-ta">தொலைபேசி இலக்கம்</div>
+                      </label>
+                      <input
+                        type="tel"
+                        className="emp-input"
+                        name="telephone"
+                        value={formData.telephone}
+                        onChange={handleChange}
+                        placeholder="Enter telephone"
+                      />
+                    </div>
+                    <div className="emp-ref-item">
+                      <label className="emp-ref-label">
+                        <div className="q-en">Designation</div>
+                        <div className="q-si">තනතුර</div>
+                        <div className="q-ta">பதவி</div>
+                      </label>
+                      <input
+                        type="text"
+                        className="emp-input"
+                        name="designation"
+                        value={formData.designation}
+                        onChange={handleChange}
+                        placeholder="Enter designation"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-            <div className="s14-lbl"><div className="q-en">Specify the income source</div><div className="q-si">ආදායම් මාර්ගය සඳහන් කරන්න</div><div className="q-ta">வருமான மூலம் குறிப்பிடவும்</div></div>
-            <div className="s14-ans"><input className="line-input" name="specificIncomeSource" value={formData.specificIncomeSource} onChange={handleChange} /></div>
-
-            <div className="s14-lbl"><div className="q-en">Additional Income sources</div><div className="q-si">අමතර ආදායම් මාර්ග</div><div className="q-ta">பிற வருமான ஆதாரம்</div></div>
-            <div className="s14-ans"><input className="line-input" name="additionalIncomeSources" value={formData.additionalIncomeSources} onChange={handleChange} /></div>
+            {/* Income Source Details Card */}
+            <div className="employer-card">
+              <div className="employer-header">
+                <div className="employer-icon">💰</div>
+                <div className="employer-title">
+                  <div className="q-en">Income Source Details</div>
+                  <div className="q-si">ආදායම් මූලාශ්‍ර විස්තර</div>
+                  <div className="q-ta">வருமான மூல விவரங்கள்</div>
+                </div>
+              </div>
+              <div className="employer-fields">
+                <div className="emp-field">
+                  <label className="emp-label">
+                    <div className="q-en">Main Income source</div>
+                    <div className="q-si">ප්‍රධාන ආදායම් මූලාශ්‍රය</div>
+                    <div className="q-ta">முக்கிய வருமான மூலம்</div>
+                  </label>
+                  <div className="emp-income-sub">
+                    <div className="q-en">Employment / Professional / business</div>
+                    <div className="q-si">රැකියාව / වෘත්තිය / ව්‍යාපාරය</div>
+                    <div className="q-ta">வேலை / தொழில் / வணிகம்</div>
+                  </div>
+                  <input
+                    type="text"
+                    className="emp-input"
+                    name="employmentProfessionalBusiness"
+                    value={formData.employmentProfessionalBusiness}
+                    onChange={handleChange}
+                    placeholder="Enter main income source"
+                  />
+                </div>
+                <div className="emp-field">
+                  <label className="emp-label">
+                    <div className="q-en">Specify the income source</div>
+                    <div className="q-si">ආදායම් මූලාශ්‍රය සඳහන් කරන්න</div>
+                    <div className="q-ta">வருமான மூலத்தை குறிப்பிடவும்</div>
+                  </label>
+                  <input
+                    type="text"
+                    className="emp-input"
+                    name="specificIncomeSource"
+                    value={formData.specificIncomeSource}
+                    onChange={handleChange}
+                    placeholder="Specify income source"
+                  />
+                </div>
+                <div className="emp-field">
+                  <label className="emp-label">
+                    <div className="q-en">Additional Income sources</div>
+                    <div className="q-si">අමතර ආදායම් මූලාශ්‍ර</div>
+                    <div className="q-ta">கூடுதல் வருமான மூலங்கள்</div>
+                  </label>
+                  <textarea
+                    className="emp-textarea"
+                    name="additionalIncomeSources"
+                    value={formData.additionalIncomeSources}
+                    onChange={e=>{handleChange(e);autoGrow(e);}}
+                    rows={1}
+                    placeholder="Enter additional income sources..."
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
         {/* 15. Income/Expenses */}
         <section className="paper-section">
-          <div className="sec-head"><span className="q-num">15).</span><span className="q-en">Details of Present Monthly Income / Expenses</span><span className="q-si">වත්මන් මාසික ආදායම / වියදම් විස්තර</span><span className="q-ta">தற்போதைய மாதாந்த வருமான / செலவு விவரங்கள்</span></div>
+          <div className="sec-head"><span className="q-num">15).</span><span className="q-en">Details of Present Monthly Income / Expenses</span><span className="q-si">වර්තමාන මාසික ආදායම් / වියදම් විස්තර</span><span className="q-ta">தற்போதைய மாதாந்திர வருமானம் / செலவுகளின் விவரங்கள்</span></div>
           <div className="tax-row">
-            <div className="tax-q"><div className="q-en">Are You Liable For Payee Tax or Income Tax</div><div className="q-si">ඔබ ගෙවිය යුතු ආදායම් බදු හෝ Payee Tax ට යටත්ද</div><div className="q-ta">நீங்கள் Payee Tax அல்லது Income Tax செலுத்துகிறீர்களா</div></div>
-            <div className="yn-group">
-              <label className="yn-lbl">Yes <span className="q-si">ඔව්</span> <span className="q-ta">ஆம்</span><input type="checkbox" checked={formData.liableForTax==="Yes"} onChange={()=>toggleCheck("liableForTax","Yes")} /></label>
-              <label className="yn-lbl">No <span className="q-si">නැත</span> <span className="q-ta">இல்லை</span><input type="checkbox" checked={formData.liableForTax==="No"} onChange={()=>toggleCheck("liableForTax","No")} /></label>
+            <div className="tax-q"><div className="q-en">Are You Liable For Payee Tax or Income Tax</div><div className="q-si">ඔබට Payee Tax හෝ ආදායම් බදුව සඳහා වගකිව යුතුද?</div><div className="q-ta">உங்களுக்கு Payee Tax அல்லது Income Tax கட்டணம் உள்ளதா?</div></div>
+            <div className="res-radio-grid">
+              <label className={`res-radio-card ${formData.liableForTax==="Yes" ? 'active' : ''}`}>
+                <input type="radio" name="liableForTax" value="Yes" checked={formData.liableForTax==="Yes"} onChange={()=>setFormData(p => ({ ...p, liableForTax: "Yes" }))} />
+                <div className="res-radio-content">Yes</div>
+                <div className="q-si">ඔව්</div>
+                <div className="q-ta">ஆம்</div>
+              </label>
+              <label className={`res-radio-card ${formData.liableForTax==="No" ? 'active' : ''}`}>
+                <input type="radio" name="liableForTax" value="No" checked={formData.liableForTax==="No"} onChange={()=>setFormData(p => ({ ...p, liableForTax: "No" }))} />
+                <div className="res-radio-content">No</div>
+                <div className="q-si">නැත</div>
+                <div className="q-ta">இல்லை</div>
+              </label>
             </div>
-            <div className="tax-file-grp"><div className="q-en" style={{fontSize:11}}>If Yes , File No : <span className="q-si">එසේනම් ලිපිගොනු අංකය</span></div><input className="line-input" name="taxFileNo" value={formData.taxFileNo} onChange={handleChange} /></div>
+            {formData.liableForTax === "Yes" && (
+              <div className="tax-file-grp">
+                <label className="tax-file-label">
+                  <div className="q-en">If Yes , File No :</div>
+                  <div className="q-si">ඔව් නම්, ගොනු අංකය</div>
+                </label>
+                <input className="line-input" name="taxFileNo" value={formData.taxFileNo} onChange={handleChange} />
+              </div>
+            )}
           </div>
-          <table className="paper-table income-table">
+          <div className="table-wrap guarantor-wrap">
+            <table className="paper-table guarantor-table">
             <tbody>
               <tr className="income-head-row"><td colSpan={2}><strong>Income</strong> <span className="q-si">ආදායම්</span> <span className="q-ta">வருமானம்</span></td></tr>
               {incomeRows.map(r=>(
-                <tr key={r.key}><td className="inc-lbl"><div className="q-en">{r.label}</div><div className="q-si">{r.si}</div><div className="q-ta">{r.ta}</div></td><td className="inc-amt"><input value={formData[r.key]} onChange={e=>setFormData(p=>({...p,[r.key]:e.target.value}))} /></td></tr>
+                <tr key={r.key}>
+                  <td className="inc-lbl">
+                    <div className="q-en">{r.label}</div>
+                    <div className="q-si">{r.si}</div>
+                    <div className="q-ta">{r.ta}</div>
+                  </td>
+                  <td className="inc-amt">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={formData[r.key]}
+                      onChange={handleChange}
+                      name={r.key}
+                    />
+                    {errors[r.key] && <span className="error-text">{errors[r.key]}</span>}
+                  </td>
+                </tr>
               ))}
               <tr className="total-row"><td className="inc-lbl"><strong>Total Income</strong> <span className="q-si">මුළු ආදායම</span> <span className="q-ta">மொத்த வருமானம்</span></td><td className="inc-amt total-val">{totalIncome>0?totalIncome.toLocaleString():""}</td></tr>
               <tr className="income-head-row"><td colSpan={2}><strong>Expenses</strong> <span className="q-si">වියදම්</span> <span className="q-ta">செலவுகள்</span></td></tr>
               {expenseRows.map(r=>(
-                <tr key={r.key}><td className="inc-lbl"><div className="q-en">{r.label}</div><div className="q-si">{r.si}</div><div className="q-ta">{r.ta}</div></td><td className="inc-amt"><input value={formData[r.key]} onChange={e=>setFormData(p=>({...p,[r.key]:e.target.value}))} /></td></tr>
+                <tr key={r.key}>
+                  <td className="inc-lbl">
+                    <div className="q-en">{r.label}</div>
+                    <div className="q-si">{r.si}</div>
+                    <div className="q-ta">{r.ta}</div>
+                  </td>
+                  <td className="inc-amt">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={formData[r.key]}
+                      onChange={handleChange}
+                      name={r.key}
+                    />
+                    {errors[r.key] && <span className="error-text">{errors[r.key]}</span>}
+                  </td>
+                </tr>
               ))}
-              <tr className="total-row"><td className="inc-lbl"><strong>Total Expenses</strong> <span className="q-si">මුළු වියදම</span> <span className="q-ta">மொத்த செலவுகள்</span></td><td className="inc-amt total-val">{totalExpenses>0?totalExpenses.toLocaleString():""}</td></tr>
+              <tr className="total-row"><td className="inc-lbl"><strong>Total Expenses</strong> <span className="q-si">මුළු වියදම්</span> <span className="q-ta">மொத்த செலவுகள்</span></td><td className="inc-amt total-val">{totalExpenses>0?totalExpenses.toLocaleString():""}</td></tr>
             </tbody>
-          </table>
+            </table>
+          </div>
         </section>
 
         {/* 16. Proposed Guarantors */}
         <section className="paper-section">
-          <div className="sec-head"><span className="q-num">16).</span><span className="q-en">Proposed Guarantors</span><span className="q-si">යෝජිත ඇපකරුවන්</span><span className="q-ta">முன்மொழியப்பட்ட பிணையாளர்கள்</span></div>
-          <table className="paper-table guarantor-table">
-            <thead><tr>
-              <th style={{width:"4%"}}></th>
-              <th><div>Full Name</div><div className="th-si">සම්පූර්ණ නම</div><div className="th-ta">முழுப் பெயர்</div></th>
-              <th><div>Relationship</div><div className="th-si">සම්බන්ධතාවය</div><div className="th-ta">உறவு</div></th>
-              <th><div>NIC / Business Reg.No</div><div className="th-si">ජා.හැ.අ. / ව්‍යාපාර ලියාපදිංචි අංකය</div><div className="th-ta">தே.அ.அ / வியாபார பதிவு இல</div></th>
-            </tr></thead>
-            <tbody>
-              {formData.guarantors.map((row,i)=>(
-                <React.Fragment key={i}>
-                  <tr>
-                    <td rowSpan={2} className="g-num">{i+1}{i>=2&&<button type="button" className="del-row-btn del-small" onClick={()=>removeRow("guarantors",i)}>✕</button>}</td>
+          <div className="sec-head"><span className="q-num">16).</span><span className="q-en">Proposed Guarantors</span><span className="q-si">යෝජිත ගැරන්ටර්වරු</span><span className="q-ta">முன்மொழியப்பட்ட உத்தரவாதத்தார்கள்</span></div>
+          <div className="table-wrap guarantor-wrap">
+            <table className="paper-table guarantor-table">
+              <thead>
+                <tr>
+                  <th style={{width:"6%"}}>No</th>
+                  <th><div>Full Name</div><div className="th-si">සම්පූර්ණ නම</div><div className="th-ta">முழுப் பெயர்</div></th>
+                  <th><div>Relationship</div><div className="th-si">සම්බන්ධතාවය</div><div className="th-ta">உறவு</div></th>
+                  <th><div>NIC / Business Reg.No</div><div className="th-si">ජා.හැ.අ. / ව්‍යාපාර ලේඛන අංකය</div><div className="th-ta">ஜா.ந.அ. / வணிக பதிவு எண்</div></th>
+                  <th style={{width:"8%"}}><div>Age</div><div className="th-si">වයස</div><div className="th-ta">வயது</div></th>
+                  <th style={{width:"9%"}}><div>Months</div><div className="th-si">මාස</div><div className="th-ta">மாதங்கள்</div></th>
+                </tr>
+              </thead>
+              <tbody>
+                {formData.guarantors.map((row,i)=>(
+                  <tr key={i} className="guarantor-row">
+                    <td className="g-num">
+                      <span>{i+1}</span>
+                      {i>=2 && (
+                        <button type="button" className="del-row-btn del-small" onClick={()=>removeRow("guarantors",i)}>✕</button>
+                      )}
+                    </td>
                     <td><input value={row.fullName} onChange={e=>tableChange("guarantors",i,"fullName",e.target.value)} /></td>
                     <td><input value={row.relationship} onChange={e=>tableChange("guarantors",i,"relationship",e.target.value)} /></td>
                     <td><input value={row.nicBusinessRegNo} onChange={e=>tableChange("guarantors",i,"nicBusinessRegNo",e.target.value)} /></td>
-                  </tr>
-                  <tr>
-                    <td colSpan={3}>
-                      <div className="age-months">
-                        <span className="q-en">Age <span className="q-si">වයස</span> <span className="q-ta">வயது</span></span>
-                        <input className="small-box" value={row.age} onChange={e=>tableChange("guarantors",i,"age",e.target.value)} />
-                        <span className="q-en">Months <span className="q-si">මාස</span> <span className="q-ta">மாதம்</span></span>
-                        <input className="small-box" value={row.months} onChange={e=>tableChange("guarantors",i,"months",e.target.value)} />
-                      </div>
+                    <td>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        className="small-box"
+                        value={row.age}
+                        onChange={e=>tableChange("guarantors",i,"age",e.target.value)}
+                      />
+                      {errors[`guarantors.${i}.age`] && (
+                        <span className="error-text">{errors[`guarantors.${i}.age`]}</span>
+                      )}
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        className="small-box"
+                        value={row.months}
+                        onChange={e=>tableChange("guarantors",i,"months",e.target.value)}
+                      />
+                      {errors[`guarantors.${i}.months`] && (
+                        <span className="error-text">{errors[`guarantors.${i}.months`]}</span>
+                      )}
                     </td>
                   </tr>
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <button type="button" className="add-row-btn" onClick={()=>addRow("guarantors",emptyGuarantorRow)}>+ Add Guarantor</button>
         </section>
 
         {/* 17. Property */}
-        <section className="paper-section">
-          <div className="sec-head"><span className="q-num">17).</span><span className="q-en">Particulars Of Immovable &amp; Movable Property Owned</span><span className="q-si">ඔබට අයිති චල හා අචල දේපල විස්තර</span><span className="q-ta">அசையும் அசையா சொந்தங்கள்</span></div>
+        <section className="paper-section property-section">
+          <div className="sec-head">
+            <span className="q-num">17).</span>
+            <span className="q-en">Particulars Of Immovable &amp; Movable Property Owned</span>
+            <span className="q-si">හිමි ස්ථාවර හා චංචල දේපළ විස්තර</span>
+            <span className="q-ta">சொந்தமான நிலையான மற்றும் நகரும் சொத்துகளின் விவரங்கள்</span>
+          </div>
 
-          <div className="prop-sub-head">Land and Building <span className="q-si">ඉඩම් සහ ගොඩනැගිලි</span> <span className="q-ta">காணி மற்றும் கட்டிடங்கள்</span></div>
-          <table className="paper-table land-table">
-            <thead><tr>
-              <th><div>Location</div><div className="th-si">පිහිට ස්ථානය</div><div className="th-ta">அமைவிடம்</div></th>
-              <th><div>Extent</div><div className="th-si">ප්‍රමාණය</div><div className="th-ta">பரப்பு</div></th>
-              <th><div>Value (Rs.)</div><div className="th-si">වටිනාකම රු.</div><div className="th-ta">பெறுமதி</div></th>
-              <th><div>Deed No.</div><div className="th-si">ඔප්පු අංකය</div><div className="th-ta">ஆவண இல</div></th>
-              <th><div>Mortgaged</div><div className="th-si">උකස්</div><div className="th-ta">அடகு</div></th>
-            </tr></thead>
-            <tbody>{formData.landBuildings.map((r,i)=><tr key={i}><td><input value={r.location} onChange={e=>tableChange("landBuildings",i,"location",e.target.value)} /></td><td><input value={r.extent} onChange={e=>tableChange("landBuildings",i,"extent",e.target.value)} /></td><td><input value={r.value} placeholder="Rs." onChange={e=>tableChange("landBuildings",i,"value",e.target.value)} /></td><td><input value={r.deedNo} onChange={e=>tableChange("landBuildings",i,"deedNo",e.target.value)} /></td><td><div className="yn-radio"><label><span>Yes</span><input type="radio" name={`lm${i}`} checked={r.mortgaged==="Yes"} onChange={()=>tableChange("landBuildings",i,"mortgaged","Yes")} /></label><label><span>No</span><input type="radio" name={`lm${i}`} checked={r.mortgaged==="No"} onChange={()=>tableChange("landBuildings",i,"mortgaged","No")} /></label>{i>=2&&<button type="button" className="del-row-btn" onClick={()=>removeRow("landBuildings",i)}>✕</button>}</div></td></tr>)}</tbody>
-          </table>
-          <button type="button" className="add-row-btn" onClick={()=>addRow("landBuildings",emptyLandRow)}>+ Add Row</button>
-
-          <div className="prop-sub-head" style={{marginTop:10}}>Vehicle <span className="q-si">වාහන</span> <span className="q-ta">வாகனம்</span></div>
-          <table className="paper-table vehicle-table">
-            <thead><tr>
-              <th><div>Make &amp; Model</div><div className="th-si">වර්ගය සහ මාදිලිය</div><div className="th-ta">வகை மற்றும் மாதிரி</div></th>
-              <th><div>Value (Rs.)</div><div className="th-si">වටිනාකම</div><div className="th-ta">பெறுமதி</div></th>
-              <th><div>Reg. No</div><div className="th-si">ලිය.ස. අංකය</div><div className="th-ta">பதிவிடப்பட்ட இல</div></th>
-              <th><div>Own/Mortgaged/Leased/Hire Purchase</div><div className="th-si">සෝන්ත/උකස්/කුලිඅදා/ගෙවා ගනිමු</div><div className="th-ta">சொந்த/அடமானம்/குத்தகை/தவணைமுறை</div></th>
-            </tr></thead>
-            <tbody>{formData.vehicles.map((r,i)=><tr key={i}><td><input value={r.makeModel} onChange={e=>tableChange("vehicles",i,"makeModel",e.target.value)} /></td><td><input value={r.value} placeholder="Rs." onChange={e=>tableChange("vehicles",i,"value",e.target.value)} /></td><td><input value={r.regNo} onChange={e=>tableChange("vehicles",i,"regNo",e.target.value)} /></td><td className="td-with-del"><input value={r.ownership} onChange={e=>tableChange("vehicles",i,"ownership",e.target.value)} />{i>=2&&<button type="button" className="del-row-btn" onClick={()=>removeRow("vehicles",i)}>✕</button>}</td></tr>)}</tbody>
-          </table>
-          <button type="button" className="add-row-btn" onClick={()=>addRow("vehicles",emptyVehicleRow)}>+ Add Row</button>
-
-          <div className="prop-sub-head" style={{marginTop:10}}>Shares <span className="q-si">කොටස්</span> <span className="q-ta">பங்கு</span></div>
-          <table className="paper-table shares-table">
-            <thead><tr>
-              <th><div>Name of Institution</div><div className="th-si">ආයතනයේ නම</div><div className="th-ta">சம்பனியின் பெயர்</div></th>
-              <th><div>Current Value (Rs.)</div><div className="th-si">වටිනාකම</div><div className="th-ta">தற்போதைய பெறுமதி</div></th>
-              <th><div>No. of Shares</div><div className="th-si">කොටස් ගණන</div><div className="th-ta">பங்குகள் எண்ணிக்கை</div></th>
-            </tr></thead>
-            <tbody>{formData.shares.map((r,i)=><tr key={i}><td><input value={r.institution} onChange={e=>tableChange("shares",i,"institution",e.target.value)} /></td><td><input value={r.currentValue} placeholder="Rs." onChange={e=>tableChange("shares",i,"currentValue",e.target.value)} /></td><td className="td-with-del"><input value={r.noOfShares} onChange={e=>tableChange("shares",i,"noOfShares",e.target.value)} />{i>=2&&<button type="button" className="del-row-btn" onClick={()=>removeRow("shares",i)}>✕</button>}</td></tr>)}</tbody>
-          </table>
-          <button type="button" className="add-row-btn" onClick={()=>addRow("shares",emptyShareRow)}>+ Add Row</button>
-
-          <div className="ins-dep-section">
-            {[{k:"lifeInsurance",sk:"lifeInsuranceSpecify",en:"Life Insurance",si:"ජීවිත රක්ෂණය",ta:"வாழ்க்கை காப்புறுதி"},{k:"deposits",sk:"depositsSpecify",en:"Deposits",si:"සංචිත",ta:"வைப்பிலிகள்"}].map(({k,sk,en,si,ta})=>(
-              <div key={k} className="ins-dep-row">
-                <div className="ins-name"><div className="q-en">{en}</div><div className="q-si">{si}</div><div className="q-ta">{ta}</div></div>
-                <div className="yn-group">
-                  <label className="yn-lbl">Yes <span className="q-si">ඔව්</span> <span className="q-ta">ஆம்</span><input type="checkbox" checked={formData[k]==="Yes"} onChange={()=>toggleCheck(k,"Yes")} /></label>
-                  <label className="yn-lbl">No <span className="q-si">නැත</span> <span className="q-ta">இல்லை</span><input type="checkbox" checked={formData[k]==="No"} onChange={()=>toggleCheck(k,"No")} /></label>
+          <div className="property-grid">
+            <div className="property-card">
+              <div className="property-card-header">
+                <div className="property-card-title">
+                  <div className="q-en">Land and Building</div>
+                  <div className="q-si">ඉඩම් සහ ගොඩනැගිලි</div>
+                  <div className="q-ta">நிலம் மற்றும் கட்டிடம்</div>
                 </div>
-                <div className="ins-spec"><span className="q-en">If Yes Please Specify <span className="q-si">එසේනම් සඳහන් කරන්න</span></span><input className="line-input" name={sk} value={formData[sk]} onChange={handleChange} /></div>
               </div>
-            ))}
+              <div className="table-wrap guarantor-wrap">
+                <table className="paper-table guarantor-table">
+                  <thead>
+                    <tr>
+                      <th style={{width:"6%"}}>
+                        <div>No</div>
+                        <div className="th-si">අංකය</div>
+                        <div className="th-ta">இல.</div>
+                      </th>
+                      <th>
+                        <div>Location</div>
+                        <div className="th-si">ස්ථානය</div>
+                        <div className="th-ta">இடம்</div>
+                      </th>
+                      <th>
+                        <div>Extent</div>
+                        <div className="th-si">ප්‍රමාණය</div>
+                        <div className="th-ta">அளவு</div>
+                      </th>
+                      <th>
+                        <div>Value (Rs.)</div>
+                        <div className="th-si">වටිනාකම (රු.)</div>
+                        <div className="th-ta">மதிப்பு (ரூ.)</div>
+                      </th>
+                      <th>
+                        <div>Deed No.</div>
+                        <div className="th-si">ඔප්පු අංකය</div>
+                        <div className="th-ta">உறுதி எண்</div>
+                      </th>
+                      <th>
+                        <div>Mortgaged</div>
+                        <div className="th-si">උකස් කර ඇත</div>
+                        <div className="th-ta">அடகு வைக்கப்பட்டது</div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formData.landBuildings.map((r,i)=>(
+                      <tr key={i} className="guarantor-row">
+                        <td className="g-num">
+                          <span>{i+1}</span>
+                        </td>
+                        <td><input value={r.location} onChange={e=>tableChange("landBuildings",i,"location",e.target.value)} /></td>
+                        <td><input value={r.extent} onChange={e=>tableChange("landBuildings",i,"extent",e.target.value)} /></td>
+                        <td>
+                          <div className="money-input">
+                            <span>Rs.</span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={r.value}
+                              onChange={e=>tableChange("landBuildings",i,"value",e.target.value)}
+                            />
+                          </div>
+                          {errors[`landBuildings.${i}.value`] && (
+                            <span className="error-text">{errors[`landBuildings.${i}.value`]}</span>
+                          )}
+                        </td>
+                        <td><input value={r.deedNo} onChange={e=>tableChange("landBuildings",i,"deedNo",e.target.value)} /></td>
+                        <td>
+                          <div className="radio-inline">
+                            <label><input type="radio" name={`lm-table-${i}`} value="Yes" checked={r.mortgaged==="Yes"} onChange={()=>tableChange("landBuildings",i,"mortgaged","Yes")} /> Yes</label>
+                            <label><input type="radio" name={`lm-table-${i}`} value="No" checked={r.mortgaged==="No"} onChange={()=>tableChange("landBuildings",i,"mortgaged","No")} /> No</label>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Mobile Cards for Land and Building */}
+              <div className="mobile-table-cards">
+                {formData.landBuildings.map((r,i)=>(
+                  <div key={i} className="mobile-table-card">
+                    <div className="card-header">
+                      {i+1}. Land & Building
+                    </div>
+                    <div className="field-row">
+                      <label>
+                        <div className="q-en">Location</div>
+                        <div className="q-si">ස්ථානය</div>
+                        <div className="q-ta">இடம்</div>
+                      </label>
+                      <input value={r.location} onChange={e=>tableChange("landBuildings",i,"location",e.target.value)} />
+                    </div>
+                    <div className="field-row">
+                      <label>
+                        <div className="q-en">Extent</div>
+                        <div className="q-si">ප්‍රමාණය</div>
+                        <div className="q-ta">அளவு</div>
+                      </label>
+                      <input value={r.extent} onChange={e=>tableChange("landBuildings",i,"extent",e.target.value)} />
+                    </div>
+                    <div className="field-row">
+                      <label>
+                        <div className="q-en">Value (Rs.)</div>
+                        <div className="q-si">වටිනාකම (රු.)</div>
+                        <div className="q-ta">மதிப்பு (ரூ.)</div>
+                      </label>
+                      <div className="money-input">
+                        <span>Rs.</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={r.value}
+                          onChange={e=>tableChange("landBuildings",i,"value",e.target.value)}
+                        />
+                      </div>
+                      {errors[`landBuildings.${i}.value`] && (
+                        <span className="error-text">{errors[`landBuildings.${i}.value`]}</span>
+                      )}
+                    </div>
+                    <div className="field-row">
+                      <label>
+                        <div className="q-en">Deed No.</div>
+                        <div className="q-si">ඔප්පු අංකය</div>
+                        <div className="q-ta">உறுதி எண்</div>
+                      </label>
+                      <input value={r.deedNo} onChange={e=>tableChange("landBuildings",i,"deedNo",e.target.value)} />
+                    </div>
+                    <div className="field-row">
+                      <label>
+                        <div className="q-en">Mortgaged</div>
+                        <div className="q-si">උකස් කර ඇත</div>
+                        <div className="q-ta">அடகு வைக்கப்பட்டது</div>
+                      </label>
+                      <div className="radio-inline">
+                        <label><input type="radio" name={`lm-mobile-${i}`} value="Yes" checked={r.mortgaged==="Yes"} onChange={()=>tableChange("landBuildings",i,"mortgaged","Yes")} /> Yes</label>
+                        <label><input type="radio" name={`lm-mobile-${i}`} value="No" checked={r.mortgaged==="No"} onChange={()=>tableChange("landBuildings",i,"mortgaged","No")} /> No</label>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <button type="button" className="add-row-btn" onClick={()=>addRow("landBuildings",emptyLandRow)}>+ Add Row</button>
+            </div>
+
+            <div className="property-card">
+              <div className="property-card-header">
+                <div className="property-card-title">
+                  <div className="q-en">Vehicle</div>
+                  <div className="q-si">වාහනය</div>
+                  <div className="q-ta">வாகனம்</div>
+                </div>
+              </div>
+              <div className="table-wrap guarantor-wrap">
+                <table className="paper-table guarantor-table">
+                  <thead>
+                    <tr>
+                      <th style={{width:"6%"}}>
+                        <div>No</div>
+                        <div className="th-si">අංකය</div>
+                        <div className="th-ta">இல.</div>
+                      </th>
+                      <th>
+                        <div>Make &amp; Model</div>
+                        <div className="th-si">නිෂ්පාදකයා සහ ආකෘතිය</div>
+                        <div className="th-ta">தயாரிப்பு மற்றும் மாடல்</div>
+                      </th>
+                      <th>
+                        <div>Value (Rs.)</div>
+                        <div className="th-si">වටිනාකම (රු.)</div>
+                        <div className="th-ta">மதிப்பு (ரூ.)</div>
+                      </th>
+                      <th>
+                        <div>Reg. No</div>
+                        <div className="th-si">ලියාපදිංචි අංකය</div>
+                        <div className="th-ta">பதிவு எண்</div>
+                      </th>
+                      <th>
+                        <div>Own/Mortgaged/Leased/Hire Purchase</div>
+                        <div className="th-si">හිමි / උකස් / ලීස් / හයර් පර්චස්</div>
+                        <div className="th-ta">சொந்தம் / அடகு / குத்தகை / வாடகை கொள்முதல்</div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formData.vehicles.map((r,i)=>(
+                      <tr key={i} className="guarantor-row">
+                        <td className="g-num">
+                          <span>{i+1}</span>
+                        </td>
+                        <td><input value={r.makeModel} onChange={e=>tableChange("vehicles",i,"makeModel",e.target.value)} /></td>
+                        <td>
+                          <div className="money-input">
+                            <span>Rs.</span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={r.value}
+                              onChange={e=>tableChange("vehicles",i,"value",e.target.value)}
+                            />
+                          </div>
+                          {errors[`vehicles.${i}.value`] && (
+                            <span className="error-text">{errors[`vehicles.${i}.value`]}</span>
+                          )}
+                        </td>
+                        <td><input value={r.regNo} onChange={e=>tableChange("vehicles",i,"regNo",e.target.value)} /></td>
+                        <td>
+                          <select value={r.ownership} onChange={e=>tableChange("vehicles",i,"ownership",e.target.value)}>
+                            <option value="">Select / තෝරන්න / தேர்ந்தெடு</option>
+                            <option value="Own">Own / හිමි / சொந்தம்</option>
+                            <option value="Mortgaged">Mortgaged / උකස් / அடகு</option>
+                            <option value="Leased">Leased / ලීස් / குத்தகை</option>
+                            <option value="Hire Purchase">Hire Purchase / හයර් පර්චස් / வாடகை கொள்முதல்</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Mobile Cards for Vehicles */}
+              <div className="mobile-table-cards">
+                {formData.vehicles.map((r,i)=>(
+                  <div key={i} className="mobile-table-card">
+                    <div className="card-header">
+                      {i+1}. Vehicle
+                    </div>
+                    <div className="field-row">
+                      <label>
+                        <div className="q-en">Make & Model</div>
+                        <div className="q-si">නිෂ්පාදකයා සහ ආකෘතිය</div>
+                        <div className="q-ta">தயாரிப்பு மற்றும் மாடல்</div>
+                      </label>
+                      <input value={r.makeModel} onChange={e=>tableChange("vehicles",i,"makeModel",e.target.value)} />
+                    </div>
+                    <div className="field-row">
+                      <label>
+                        <div className="q-en">Value (Rs.)</div>
+                        <div className="q-si">වටිනාකම (රු.)</div>
+                        <div className="q-ta">மதிப்பு (ரூ.)</div>
+                      </label>
+                      <div className="money-input">
+                        <span>Rs.</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={r.value}
+                          onChange={e=>tableChange("vehicles",i,"value",e.target.value)}
+                        />
+                      </div>
+                      {errors[`vehicles.${i}.value`] && (
+                        <span className="error-text">{errors[`vehicles.${i}.value`]}</span>
+                      )}
+                    </div>
+                    <div className="field-row">
+                      <label>
+                        <div className="q-en">Reg. No</div>
+                        <div className="q-si">ලියාපදිංචි අංකය</div>
+                        <div className="q-ta">பதிவு எண்</div>
+                      </label>
+                      <input value={r.regNo} onChange={e=>tableChange("vehicles",i,"regNo",e.target.value)} />
+                    </div>
+                    <div className="field-row">
+                      <label>
+                        <div className="q-en">Own/Mortgaged/Leased/Hire Purchase</div>
+                        <div className="q-si">හිමි / උකස් / ලීස් / හයර් පර්චස්</div>
+                        <div className="q-ta">சொந்தம் / அடகு / குத்தகை / வாடகை கொள்முதல்</div>
+                      </label>
+                      <select value={r.ownership} onChange={e=>tableChange("vehicles",i,"ownership",e.target.value)}>
+                        <option value="">Select / තෝරන්න / தேர்ந்தெடு</option>
+                        <option value="Own">Own / හිමි / சொந்தம்</option>
+                        <option value="Mortgaged">Mortgaged / උකස් / அடகு</option>
+                        <option value="Leased">Leased / ලීස් / குத்தகை</option>
+                        <option value="Hire Purchase">Hire Purchase / හයර් පර්චස් / வாடகை கொள்முதல்</option>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <button type="button" className="add-row-btn" onClick={()=>addRow("vehicles",emptyVehicleRow)}>+ Add Row</button>
+            </div>
+
+            <div className="property-card">
+              <div className="property-card-header">
+                <div className="property-card-title">
+                  <div className="q-en">Shares</div>
+                  <div className="q-si">කොටස්</div>
+                  <div className="q-ta">பங்குகள்</div>
+                </div>
+              </div>
+              <div className="table-wrap guarantor-wrap">
+                <table className="paper-table guarantor-table">
+                  <thead>
+                    <tr>
+                      <th style={{width:"6%"}}>
+                        <div>No</div>
+                        <div className="th-si">අංකය</div>
+                        <div className="th-ta">இல.</div>
+                      </th>
+                      <th>
+                        <div>Name of Institution</div>
+                        <div className="th-si">ආයතනයේ නම</div>
+                        <div className="th-ta">நிறுவனத்தின் பெயர்</div>
+                      </th>
+                      <th>
+                        <div>Current Value (Rs.)</div>
+                        <div className="th-si">වර්තමාන වටිනාකම (රු.)</div>
+                        <div className="th-ta">தற்போதைய மதிப்பு (ரூ.)</div>
+                      </th>
+                      <th>
+                        <div>No. of Shares</div>
+                        <div className="th-si">කොටස් ගණන</div>
+                        <div className="th-ta">பங்குகளின் எண்ணிக்கை</div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formData.shares.map((r,i)=>(
+                      <tr key={i} className="guarantor-row">
+                        <td className="g-num">
+                          <span>{i+1}</span>
+                        </td>
+                        <td><input value={r.institution} onChange={e=>tableChange("shares",i,"institution",e.target.value)} /></td>
+                        <td>
+                          <div className="money-input">
+                            <span>Rs.</span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={r.currentValue}
+                              onChange={e=>tableChange("shares",i,"currentValue",e.target.value)}
+                            />
+                          </div>
+                          {errors[`shares.${i}.currentValue`] && (
+                            <span className="error-text">{errors[`shares.${i}.currentValue`]}</span>
+                          )}
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={r.noOfShares}
+                            onChange={e=>tableChange("shares",i,"noOfShares",e.target.value)}
+                          />
+                          {errors[`shares.${i}.noOfShares`] && (
+                            <span className="error-text">{errors[`shares.${i}.noOfShares`]}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Mobile Cards for Shares */}
+              <div className="mobile-table-cards">
+                {formData.shares.map((r,i)=>(
+                  <div key={i} className="mobile-table-card">
+                    <div className="card-header">
+                      {i+1}. Share
+                    </div>
+                    <div className="field-row">
+                      <label>
+                        <div className="q-en">Name of Institution</div>
+                        <div className="q-si">ආයතනයේ නම</div>
+                        <div className="q-ta">நிறுவனத்தின் பெயர்</div>
+                      </label>
+                      <input value={r.institution} onChange={e=>tableChange("shares",i,"institution",e.target.value)} />
+                    </div>
+                    <div className="field-row">
+                      <label>
+                        <div className="q-en">Current Value (Rs.)</div>
+                        <div className="q-si">වර්තමාන වටිනාකම (රු.)</div>
+                        <div className="q-ta">தற்போதைய மதிப்பு (ரூ.)</div>
+                      </label>
+                      <div className="money-input">
+                        <span>Rs.</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={r.currentValue}
+                          onChange={e=>tableChange("shares",i,"currentValue",e.target.value)}
+                        />
+                      </div>
+                      {errors[`shares.${i}.currentValue`] && (
+                        <span className="error-text">{errors[`shares.${i}.currentValue`]}</span>
+                      )}
+                    </div>
+                    <div className="field-row">
+                      <label>
+                        <div className="q-en">No. of Shares</div>
+                        <div className="q-si">කොටස් ගණන</div>
+                        <div className="q-ta">பங்குகளின் எண்ணிக்கை</div>
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={r.noOfShares}
+                        onChange={e=>tableChange("shares",i,"noOfShares",e.target.value)}
+                      />
+                      {errors[`shares.${i}.noOfShares`] && (
+                        <span className="error-text">{errors[`shares.${i}.noOfShares`]}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <button type="button" className="add-row-btn" onClick={()=>addRow("shares",emptyShareRow)}>+ Add Row</button>
+            </div>
+
+            <div className="property-card property-card-full">
+              <div className="property-card-header">
+                <div className="property-card-title">
+                  <div className="q-en">Life Insurance</div>
+                  <div className="q-si">ජීවිත රක්ෂණය</div>
+                  <div className="q-ta">உயிர் காப்பீடு</div>
+                </div>
+              </div>
+              <div className="res-radio-grid">
+                <label className={`res-radio-card ${formData.lifeInsurance==="Yes" ? 'active' : ''}`}>
+                  <input type="radio" name="lifeInsurance" value="Yes" checked={formData.lifeInsurance==="Yes"} onChange={()=>toggleCheck("lifeInsurance","Yes")} />
+                  <div className="res-radio-content">Yes</div>
+                  <div className="q-si">ඔව්</div>
+                  <div className="q-ta">ஆம்</div>
+                </label>
+                <label className={`res-radio-card ${formData.lifeInsurance==="No" ? 'active' : ''}`}>
+                  <input type="radio" name="lifeInsurance" value="No" checked={formData.lifeInsurance==="No"} onChange={()=>toggleCheck("lifeInsurance","No")} />
+                  <div className="res-radio-content">No</div>
+                  <div className="q-si">නැත</div>
+                  <div className="q-ta">இல்லை</div>
+                </label>
+              </div>
+              {formData.lifeInsurance === "Yes" && (
+                <div className="property-specify">
+                  <label className="property-specify-label">If Yes Please Specify <span className="q-si">ඔව් නම් කරුණාකර සඳහන් කරන්න</span> <span className="q-ta">ஆம் என்றால் குறிப்பிடவும்</span></label>
+                  <textarea className="app-textarea" name="lifeInsuranceSpecify" value={formData.lifeInsuranceSpecify} onChange={handleChange} rows={3} placeholder="Provide details..." />
+                </div>
+              )}
+            </div>
+
+            <div className="property-card property-card-full">
+              <div className="property-card-header">
+                <div className="property-card-title">
+                  <div className="q-en">Deposits</div>
+                  <div className="q-si">තැන්පතු</div>
+                  <div className="q-ta">வைப்புகள்</div>
+                </div>
+              </div>
+              <div className="res-radio-grid">
+                <label className={`res-radio-card ${formData.deposits==="Yes" ? 'active' : ''}`}>
+                  <input type="radio" name="deposits" value="Yes" checked={formData.deposits==="Yes"} onChange={()=>toggleCheck("deposits","Yes")} />
+                  <div className="res-radio-content">Yes</div>
+                  <div className="q-si">ඔව්</div>
+                  <div className="q-ta">ஆம்</div>
+                </label>
+                <label className={`res-radio-card ${formData.deposits==="No" ? 'active' : ''}`}>
+                  <input type="radio" name="deposits" value="No" checked={formData.deposits==="No"} onChange={()=>toggleCheck("deposits","No")} />
+                  <div className="res-radio-content">No</div>
+                  <div className="q-si">නැත</div>
+                  <div className="q-ta">இல்லை</div>
+                </label>
+              </div>
+              {formData.deposits === "Yes" && (
+                <div className="property-specify">
+                  <label className="property-specify-label">If Yes Please Specify <span className="q-si">ඔව් නම් කරුණාකර සඳහන් කරන්න</span> <span className="q-ta">ஆம் என்றால் குறிப்பிடவும்</span></label>
+                  <textarea className="app-textarea" name="depositsSpecify" value={formData.depositsSpecify} onChange={handleChange} rows={3} placeholder="Provide details..." />
+                </div>
+              )}
+            </div>
           </div>
         </section>
 
         {/* 18. Facility Requirement */}
         <section className="paper-section">
-          <div className="sec-head"><span className="q-num">18).</span><span className="q-en">Facility Requirement Lease / Loan</span><span className="q-si">ලබා ගත අවශ්‍ය ලීස් / ණය</span><span className="q-ta">கடன் மற்றும் குத்தகைக்கான தேவைப்பாடுகள்</span></div>
-          <table className="paper-table facility-table">
-            <thead><tr>
-              <th><div>Make &amp; Model of Equipment</div><div className="th-si">උපකරණයේ වර්ගය සහ මාදිලිය</div><div className="th-ta">சாதனத்தின் வகை மற்றும் மாதிரி</div></th>
-              <th><div>Status</div><div className="th-si">තත්ත්වය</div><div className="th-ta">தற்போதைய நிலை</div></th>
-              <th><div>Purpose of Loan/Lease</div><div className="th-si">ණය / ලීසිං ලබා ගැනීමේ නොකාව</div><div className="th-ta">கடன் குத்தகைக்கான நோக்கம்</div></th>
-              <th><div>Supplier</div><div className="th-si">සැපයුම්කරු</div><div className="th-ta">விநியோகத்தார்</div></th>
-              <th><div>Period</div><div className="th-si">කාලය</div><div className="th-ta">கால எல்லை</div></th>
-              <th><div>Cost (Rs.)</div><div className="th-si">වටිනාකම රු.</div><div className="th-ta">மதிப்பு</div></th>
-            </tr></thead>
-            <tbody>
-              {formData.facilityRequirements.map((r,i)=><tr key={i}><td><input value={r.makeModel} onChange={e=>tableChange("facilityRequirements",i,"makeModel",e.target.value)} /></td><td><input value={r.status} onChange={e=>tableChange("facilityRequirements",i,"status",e.target.value)} /></td><td><input value={r.purpose} onChange={e=>tableChange("facilityRequirements",i,"purpose",e.target.value)} /></td><td><input value={r.supplier} onChange={e=>tableChange("facilityRequirements",i,"supplier",e.target.value)} /></td><td><input value={r.period} onChange={e=>tableChange("facilityRequirements",i,"period",e.target.value)} /></td><td className="td-with-del"><input value={r.cost} placeholder="Rs." onChange={e=>tableChange("facilityRequirements",i,"cost",e.target.value)} />{i>=3&&<button type="button" className="del-row-btn" onClick={()=>removeRow("facilityRequirements",i)}>✕</button>}</td></tr>)}
-              <tr className="total-row"><td colSpan={5} className="total-r"><strong>Total <span className="q-si">එකතුව</span></strong></td><td><strong>{totalFacilityCost>0?`Rs. ${totalFacilityCost.toLocaleString()}`:""}</strong></td></tr>
-            </tbody>
-          </table>
-          <button type="button" className="add-row-btn" onClick={()=>addRow("facilityRequirements",emptyFacilityRow)}>+ Add Row</button>
+          <div className="sec-head">
+            <span className="q-num">18).</span>
+            <span className="q-en">Facility Requirement Lease / Loan</span>
+            <span className="q-si">පහසුකම් අවශ්‍යතාවය - ලීස් / ණය</span>
+            <span className="q-ta">வசதி தேவை - குத்தகை / கடன்</span>
+          </div>
+          <div className="facility-panel">
+            <div className="table-wrap guarantor-wrap">
+              <table className="paper-table guarantor-table">
+                <thead>
+                  <tr>
+                    <th style={{width:"6%"}}>No</th>
+                    <th><div>Make &amp; Model of Equipment</div><div className="th-si">උපකරණයේ වර්ගය සහ ආකෘතිය</div><div className="th-ta">உபகரணத்தின் தயாரிப்பு மற்றும் மாடல்</div></th>
+                    <th><div>Status</div><div className="th-si">තත්ත්වය</div><div className="th-ta">நிலை</div></th>
+                    <th><div>Purpose of Loan/Lease</div><div className="th-si">ණය / ලීස් සඳහා අරමුණ</div><div className="th-ta">கடன் / குத்தகையின் நோக்கம்</div></th>
+                    <th><div>Supplier</div><div className="th-si">සපයන්නා</div><div className="th-ta">வழங்குநர்</div></th>
+                    <th><div>Period</div><div className="th-si">කාලය</div><div className="th-ta">காலம்</div></th>
+                    <th><div>Cost (Rs.)</div><div className="th-si">වියදම (රු.)</div><div className="th-ta">செலவு (ரூ.)</div></th>
+                    <th style={{width:"10%"}}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formData.facilityRequirements.map((r,i)=>(
+                    <tr key={i} className="guarantor-row">
+                      <td className="g-num">
+                        <span>{i+1}</span>
+                        {i >= 3 && <button type="button" className="del-row-btn del-small" onClick={()=>removeRow("facilityRequirements",i)}>✕</button>}
+                      </td>
+                      <td><input value={r.makeModel} onChange={e=>tableChange("facilityRequirements",i,"makeModel",e.target.value)} placeholder="Type equipment" /></td>
+                      <td><input className="table-input" value={r.status} onChange={e=>tableChange("facilityRequirements",i,"status",e.target.value)} placeholder="Status" /></td>
+                      <td><input className="table-input" value={r.purpose} onChange={e=>tableChange("facilityRequirements",i,"purpose",e.target.value)} placeholder="Purpose" /></td>
+                      <td><input className="table-input" value={r.supplier} onChange={e=>tableChange("facilityRequirements",i,"supplier",e.target.value)} placeholder="Supplier" /></td>
+                      <td><input className="table-input" value={r.period} onChange={e=>tableChange("facilityRequirements",i,"period",e.target.value)} placeholder="Period" /></td>
+                      <td><input className="table-input" type="number" inputMode="numeric" min="0" step="any" value={r.cost} placeholder="Rs." onChange={e=>tableChange("facilityRequirements",i,"cost",e.target.value)} /></td>
+                      <td className="action-cell">
+                        {i >= 3 && <button type="button" className="del-row-btn" onClick={()=>removeRow("facilityRequirements",i)}>Remove</button>}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="total-row">
+                    <td colSpan={5} className="total-r"><strong>Total <span className="q-si">මුළු එකතුව</span> <span className="q-ta">மொத்தம்</span></strong></td>
+                    <td><strong>{totalFacilityCost>0 ? `Rs. ${totalFacilityCost.toLocaleString()}` : ""}</strong></td>
+                    <td />
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="table-actions">
+              <button type="button" className="add-row-btn" onClick={()=>addRow("facilityRequirements",emptyFacilityRow)}>+ Add Row</button>
+            </div>
+          </div>
         </section>
 
         {/* 19. Preferred Language */}
         <section className="paper-section">
-          <div className="lang-sec">
-            <div className="lang-lbl"><span className="q-num">19).</span><div><div className="q-en">Preferred Language for Communication:</div><div className="q-si">සන්නිවේදනය සඳහා කැමැති භාෂාව :</div><div className="q-ta">தொடர்புக்கு விரும்பும் மொழி</div></div></div>
-            <div className="lang-opts">
+          <div className="qual-row">
+            <div className="qual-lbl"><span className="q-num">19).</span><div><div className="q-en">Preferred Language for Communication:</div><div className="q-si">සන්නිවේදනය සඳහා වැඩිපුර ප්‍රියතම භාෂාව:</div><div className="q-ta">தொடர்புக்கு விருப்பமான மொழி:</div></div></div>
+            <div className="qual-opts">
               {[["Sinhala","සිංහල","சிங்களம்"],["Tamil","දෙමළ","தமிழ்"],["English","ඉංග්‍රීසි","ஆங்கிலம்"]].map(([en,si,ta])=>(
-                <label key={en} className="lang-opt">
-                  <input type="checkbox" checked={formData.preferredLanguage===en} onChange={()=>toggleCheck("preferredLanguage",en)} />
-                  <div><div className="q-en">{en}</div><div className="q-si">{si}</div><div className="q-ta">{ta}</div></div>
+                <label key={en} className="qual-card">
+                  <input type="radio" name="preferredLanguage" checked={formData.preferredLanguage===en} onChange={()=>setFormData(p => ({ ...p, preferredLanguage: en }))} />
+                  <div className="qual-card-content">
+                    <div className="q-en">{en}</div>
+                    <div className="q-si">{si}</div>
+                    <div className="q-ta">{ta}</div>
+                  </div>
                 </label>
               ))}
             </div>
@@ -657,40 +2142,73 @@ const handleSubmit = async (e) => {
         {/* 20. Location of Leased Asset */}
         <section className="paper-section">
           <div className="s20-row">
-            <div className="s20-lbl"><span className="q-num">20).</span><div><div className="q-en">Location of Leased Asset</div><div className="q-si">කුලියට දෙන වත්කමේ පිහිට ස්ථානය</div><div className="q-ta">குத்தகை சொத்து அமைவிடம்</div></div></div>
+            <div className="s20-lbl"><span className="q-num">20).</span><div><div className="q-en">Location of Leased Asset</div><div className="q-si">කුලියට ගත් වතුවේ ස්ථානය</div><div className="q-ta">குத்தகைக்கு எடுக்கப்பட்ட சொத்தின் இடம்</div></div></div>
             <input className="line-input" name="locationOfLeasedAsset" value={formData.locationOfLeasedAsset} onChange={handleChange} />
           </div>
         </section>
 
         {/* 21. Sources of Funds */}
         <section className="paper-section">
-          <div className="sec-head wrap-head"><span className="q-num">21).</span><span className="q-en">Sources of funds and /or nature of credits into the account:</span><span className="q-si">ආදායම් මාර්ග සහ/හෝ ගිණුමේ ගෙවීම් ස්වභාවය:</span><span className="q-ta">நிதி மூலம் மற்றும் கணக்கிற்கு</span></div>
-          <div className="fund-grid">
-            {[["Business Income","ව්‍යාපාරික ආදායම","வியாபார வருமானம்"],["Salary/Earnings","ශ්‍රමය / ශ්‍රමලාභය","சம்பளம்"],["Sale of Property/ Assets","දේපල / වත්කම් අලෙවිකිරීමෙන්","சொத்து விற்பனை"],["Family Inward Remittance","පවුලේ ලද ශ්‍රමය","குடும்ப பணம் அனுப்புதல்"],["Donations Charity (Local / Foreign)","පරිත්‍යාගශීලී ශ්‍රදා (දේශීය / විදේශීය)","நன்கொடை (உள்ளூர் / வெளிநாடு)"],["Others (Specify)","වෙනත් (නිශ්චිතව සඳහන් කරන්න)","வேறு (குறிப்பிடவும்)"]].map(([en,si,ta])=>(
-              <label key={en} className="fund-item">
-                <input type="checkbox" checked={formData.fundSources.includes(en)} onChange={()=>handleFundSourceChange(en)} />
-                <div><div className="q-en">{en}</div><div className="q-si">{si}</div><div className="q-ta">{ta}</div></div>
-              </label>
-            ))}
+          <div className="qual-row">
+            <div className="qual-lbl"><span className="q-num">21).</span><div><div className="q-en">Sources of funds and /or nature of credits into the account:</div><div className="q-si">ගිණුම් මූලාශ්‍ර සහ/හෝ ගිණුම් ගනුදෙනුවේ ස්වභාවය:</div><div className="q-ta">நிதியின் மூலங்கள் மற்றும்/அல்லது கணக்கில் வரவுகளின் இயல்பு:</div></div></div>
+            <div className="qual-opts">
+              {[["Business Income","ව්‍යාපාරික ආදායම්","வணிக வருமானம்"],["Salary/Earnings","වැටුප් / ලබාගැනීම්","சம்பளம்/வருமானம்"],["Sale of Property/ Assets","දේපළ/වතු විකිණීම්","சொத்து/சொத்துகளின் விற்பனை"],["Family Inward Remittance","පවුලේ ඇතුළු පිරිනැමීම්","குடும்ப உள்நாட்டு பண அனுப்புதல்"],["Donations Charity (Local / Foreign)","පූජාවන් සුබසාධක කටයුතු (දේශීය / විදේශීය)","தானங்கள் தொண்டு (உள்நாட்டு / வெளிநாட்டு)"],["Others (Specify)","වෙනත් (සඳහන් කරන්න)","மற்றவை (குறிப்பிடுக)"]].map(([en,si,ta])=>(
+                <label key={en} className="qual-card">
+                  <input type="checkbox" checked={formData.fundSources.includes(en)} onChange={()=>handleFundSourceChange(en)} />
+                  <div className="qual-card-content">
+                    <div className="q-en">{en}</div>
+                    <div className="q-si">{si}</div>
+                    <div className="q-ta">{ta}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            {formData.fundSources.includes("Others (Specify)") && (
+              <div className="other-qual-field">
+                <label className="other-qual-label">
+                  <div className="q-en">Specify Other Source</div>
+                  <div className="q-si">වෙනත් මූලාශ්‍රය සඳහන් කරන්න</div>
+                  <div className="q-ta">பிற மூலத்தை குறிப்பிடுக</div>
+                </label>
+                <input
+                  type="text"
+                  className="other-qual-input"
+                  value={formData.otherFundSource || ""}
+                  onChange={handleChange}
+                  name="otherFundSource"
+                  placeholder="Enter other fund source"
+                />
+              </div>
+            )}
           </div>
         </section>
 
         {/* 22. Annual Turnover Individual */}
         <section className="paper-section">
-          <div className="sec-head wrap-head"><span className="q-num">22).</span><span className="q-en">Annual turnover (Individual Earnings)</span><span className="q-si">වාර්ෂික පිරිවැටුම (සහජ පුද්ගල ලාභය)</span><span className="q-ta">வருடாந்த வருமானம் (தனிப்பட்ட வருமானம்)</span></div>
-          <div className="turnover-grid">
-            {["< 499,999","500,000 - 1,499,999","1,500,000 – 2,499,999","2,500,000- 4,999,999","5,000,000 - 9,999,999","10,000,000- 19,999,999",">20,000,000"].map(r=>(
-              <label key={r} className="tv-item"><input type="checkbox" checked={formData.annualTurnoverIndividual===r} onChange={()=>toggleCheck("annualTurnoverIndividual",r)} /><span>{r}</span></label>
+          <div className="sec-head wrap-head"><span className="q-num">22).</span><span className="q-en">Annual turnover (Individual Earnings)</span><span className="q-si">වාර්ෂික පිරිවැටුම (පුද්ගල ආදායම)</span><span className="q-ta">வருடாந்திர வருமானம் (தனிப்பட்ட)</span></div>
+          <div className="turnover-opts">
+            {["< 499,999","500,000 - 1,499,999","1,500,000 – 2,499,999","2,500,000 - 4,999,999","5,000,000 - 9,999,999","10,000,000 - 19,999,999","> 20,000,000"].map(r=>(
+              <label key={r} className="qual-card">
+                <input type="radio" name="annualTurnoverIndividual" checked={formData.annualTurnoverIndividual===r} onChange={()=>toggleCheck("annualTurnoverIndividual",r)} />
+                <div className="qual-card-content">
+                  <div className="q-en">{r}</div>
+                </div>
+              </label>
             ))}
           </div>
         </section>
 
         {/* 23. Annual Turnover Business */}
         <section className="paper-section">
-          <div className="sec-head wrap-head"><span className="q-num">23).</span><span className="q-en">Annual turnover (Business Earnings)</span><span className="q-si">වාර්ෂික පිරිවැටුම (ව්‍යාපාරික ලාභය)</span><span className="q-ta">வருடாந்த வருமானம் (வியாபாரத்தின் வருமானம்)</span></div>
-          <div className="turnover-grid">
-            {["< 4,999,999","5,000,000- 9,999,999","10,000,000 – 24,999,999","25,000,000- 49,999,999","> 50,000,000"].map(r=>(
-              <label key={r} className="tv-item"><input type="checkbox" checked={formData.annualTurnoverBusiness===r} onChange={()=>toggleCheck("annualTurnoverBusiness",r)} /><span>{r}</span></label>
+          <div className="sec-head wrap-head"><span className="q-num">23).</span><span className="q-en">Annual turnover (Business Earnings)</span><span className="q-si">වාර්ෂික පිරිවැටුම (ව්‍යාපාරික ආදායම)</span><span className="q-ta">வருடாந்திர வருமானம் (வணிக)</span></div>
+          <div className="turnover-opts">
+            {["< 4,999,999","5,000,000 - 9,999,999","10,000,000 – 24,999,999","25,000,000 - 49,999,999","> 50,000,000"].map(r=>(
+              <label key={r} className="qual-card">
+                <input type="radio" name="annualTurnoverBusiness" checked={formData.annualTurnoverBusiness===r} onChange={()=>toggleCheck("annualTurnoverBusiness",r)} />
+                <div className="qual-card-content">
+                  <div className="q-en">{r}</div>
+                </div>
+              </label>
             ))}
           </div>
         </section>
@@ -698,33 +2216,46 @@ const handleSubmit = async (e) => {
         {/* 24 */}
         <section className="paper-section">
           <div className="sec-head"><span className="q-num">24).</span></div>
-          <div className="s24-block">
-            <div className="s24-row">
-              <div className="s24-lbl">
-                <span className="s24-n">1.</span>
-                <div><div className="q-en">Other connected business / Professional relationships &amp; interests:</div><div className="q-si">වෙනත් ශ්‍රිත ව්‍යාපාර / රැකියා සම්බන්ධතා සහ උනන්දු:</div><div className="q-ta">வேறு இணைந்த வியாபார / தொழில் உறவு முறைகள்</div></div>
+          <div className="s24-card">
+            <div className="s24-part">
+              <div className="s24-title">
+                <span className="s24-num">1.</span>
+                <div><div className="q-en">Other connected business / Professional relationships &amp; interests</div><div className="q-si">වෙනත් සම්බන්ධිත ව්‍යාපාර / වෘත්තීය සම්බන්ධතා සහ උනන්දුව</div><div className="q-ta">மற்ற இணைக்கப்பட்ட வணிகம் / தொழில்முறை உறவுகள் மற்றும் ஆர்வங்கள்</div></div>
               </div>
-              <input className="line-input" name="otherConnectedBusiness" value={formData.otherConnectedBusiness} onChange={handleChange} />
+              <textarea className="s24-textarea" name="otherConnectedBusiness" value={formData.otherConnectedBusiness} onChange={handleChange} placeholder="Enter details..." rows={4} />
             </div>
-            <div className="s24-row">
-              <div className="s24-lbl s24-indent"><div className="q-en">Reason to obtain a Lease / Loan facility:</div><div className="q-si">ලීස් / ණය පහසුකම් ලබා ගැනීමේ කාරණය:</div><div className="q-ta">குத்தகைக்கான காரணம் / கடன் வசதி</div></div>
-              <input className="line-input" name="reasonForLoan" value={formData.reasonForLoan} onChange={handleChange} />
-            </div>
-            <div className="s24-row s24-branch">
-              <div className="s24-lbl">
-                <span className="s24-n">2.</span>
-                <div><div className="q-en">If the Permanent address is within the Branch Service Area?</div><div className="q-si">ස්ථිර ලිපිනය ශාඛා සේවා ප්‍රදේශය තුළ සේ?</div><div className="q-ta">நிரந்தர முகவரி சேவை வழங்கும் கிளை பிரிவில் உள்ளதா</div></div>
-              </div>
-              <div className="yn-group">
-                <label className="yn-lbl">Yes <span className="q-si">ඔව්</span> <span className="q-ta">ஆம்</span><input type="checkbox" checked={formData.withinBranchServiceArea==="Yes"} onChange={()=>toggleCheck("withinBranchServiceArea","Yes")} /></label>
-                <label className="yn-lbl">No <span className="q-si">නැත</span> <span className="q-ta">இல்லை</span><input type="checkbox" checked={formData.withinBranchServiceArea==="No"} onChange={()=>toggleCheck("withinBranchServiceArea","No")} /></label>
-              </div>
-            </div>
-            <div className="s24-row">
-              <div className="s24-lbl s24-indent"><div className="q-en">If No, Reason:</div><div className="q-si">නැත නම්, හේතුව:</div><div className="q-ta">இல்லை எனில்:</div></div>
-              <input className="line-input" name="ifNoReason" value={formData.ifNoReason} onChange={handleChange} />
+            <div className="s24-divider"></div>
+            <div className="s24-part">
+              <div className="s24-title s24-title-indent"><div className="q-en">Reason to obtain a Lease / Loan facility</div><div className="q-si">කුලියට / ණය පහසුකමක් ලබාගැනීමේ හේතුව</div><div className="q-ta">குத்தகை / கடன் வசதியைப் பெறுவதற்கான காரணம்</div></div>
+              <textarea className="s24-textarea" name="reasonForLoan" value={formData.reasonForLoan} onChange={handleChange} placeholder="Enter details..." rows={4} />
             </div>
           </div>
+          <div className="s24-row s24-branch">
+            <div className="s24-lbl">
+              <span className="s24-n">2.</span>
+              <div><div className="q-en">If the Permanent address is within the Branch Service Area?</div><div className="q-si">ස්ථාවර ලිපිනය ශාඛා සේවා ප්‍රාන්තය තුළද?</div><div className="q-ta">நிரந்தர முகவரி கிளை சேவை பகுதிக்குள் இருக்கிறதா?</div></div>
+            </div>
+            <div className="res-radio-grid">
+              <label className={`res-radio-card ${formData.withinBranchServiceArea==="Yes" ? 'active' : ''}`}>
+                <input type="radio" name="withinBranchServiceArea" value="Yes" checked={formData.withinBranchServiceArea==="Yes"} onChange={()=>setFormData(p => ({ ...p, withinBranchServiceArea: "Yes" }))} />
+                <div className="res-radio-content">Yes</div>
+                <div className="q-si">ඔව්</div>
+                <div className="q-ta">ஆம்</div>
+              </label>
+              <label className={`res-radio-card ${formData.withinBranchServiceArea==="No" ? 'active' : ''}`}>
+                <input type="radio" name="withinBranchServiceArea" value="No" checked={formData.withinBranchServiceArea==="No"} onChange={()=>setFormData(p => ({ ...p, withinBranchServiceArea: "No" }))} />
+                <div className="res-radio-content">No</div>
+                <div className="q-si">නැත</div>
+                <div className="q-ta">இல்லை</div>
+              </label>
+            </div>
+          </div>
+          {formData.withinBranchServiceArea === "No" && (
+            <div className="s24-row">
+              <div className="s24-lbl s24-indent"><div className="q-en">If No, Reason:</div><div className="q-si">නැත නම්, හේතුව:</div><div className="q-ta">இல்லை என்றால், காரணம்:</div></div>
+              <textarea className="app-textarea" name="ifNoReason" value={formData.ifNoReason} onChange={handleChange} rows={3} placeholder="Provide reason..." />
+            </div>
+          )}
         </section>
 
         {/* 25. PEP */}
@@ -732,34 +2263,52 @@ const handleSubmit = async (e) => {
           <div className="pep-block">
             <div className="pep-q">
               <span className="q-num">25).</span>
-              <div><div className="q-en">Are you / Owner/s, Partner/s, Director/s, Official/s, or any family member a Political Exposed Person (PEP)?</div><div className="q-si">ඔබ / හිමිකරු / ව්‍යාපාරික හිමිකරු / ශ්‍රිත / ශ්‍රිතාධිකාරී / ඔබේ කිසියම් පවුලේ සාමාජිකයෙකු ශ්‍රිතිකාල අරාජකය (PEP)?</div><div className="q-ta">நீங்கள் / உரிமையாளர் / கூட்டாளி / இயக்குனர் / அதிகாரி / எந்த குடும்ப உறுப்பினரும் அரசியலமைப்பு வெளிப்படுத்தப்பட்ட நபர் (PEP)?</div></div>
+              <div><div className="q-en">Are you / Owner/s, Partner/s, Director/s, Official/s, or any family member a Political Exposed Person (PEP)?</div><div className="q-si">ඔබ / හිමිකරුවන් / සහකරුවන් / අධ්‍යක්ෂවරුන් / නිලධාරීන් හෝ ඕනෑම පවුලේ සාමාජිකයෙක් රාජ්‍ය ප්‍රකාශිත පුද්ගලයෙක්ද (PEP)?</div><div className="q-ta">நீங்கள் / உரிமையாளர்கள் / துணைக்குழுக்கள் / இயக்குநர்கள் / அதிகாரிகள் அல்லது எந்த குடும்ப உறுப்பினரும் அரசியல் வெளிப்படுத்தப்பட்ட நபர் (PEP) ஆவாரா?</div></div>
             </div>
             <div className="pep-ans">
-              <div className="yn-group">
-                <label className="yn-lbl">Yes <span className="q-si">ඔව්</span> <span className="q-ta">ஆம்</span><input type="checkbox" checked={formData.isPEP==="Yes"} onChange={()=>toggleCheck("isPEP","Yes")} /></label>
-                <label className="yn-lbl">No <span className="q-si">නැත</span> <span className="q-ta">இல்லை</span><input type="checkbox" checked={formData.isPEP==="No"} onChange={()=>toggleCheck("isPEP","No")} /></label>
+              <div className="res-radio-grid">
+                <label className={`res-radio-card ${formData.isPEP==="Yes" ? 'active' : ''}`}>
+                  <input type="radio" name="isPEP" value="Yes" checked={formData.isPEP==="Yes"} onChange={()=>setFormData(p => ({ ...p, isPEP: "Yes" }))} />
+                  <div className="res-radio-content">Yes</div>
+                  <div className="q-si">ඔව්</div>
+                  <div className="q-ta">ஆம்</div>
+                </label>
+                <label className={`res-radio-card ${formData.isPEP==="No" ? 'active' : ''}`}>
+                  <input type="radio" name="isPEP" value="No" checked={formData.isPEP==="No"} onChange={()=>setFormData(p => ({ ...p, isPEP: "No" }))} />
+                  <div className="res-radio-content">No</div>
+                  <div className="q-si">නැත</div>
+                  <div className="q-ta">இல்லை</div>
+                </label>
               </div>
-              <div className="pep-specify">
-                <div className="q-en">If Yes please specify the relationship: <span className="q-si">ඔව් නම් සම්බන්ධතාවය සඳහන් කරන්න:</span> <span className="q-ta">ஆம் எனில் உறவை குறிப்பிடவும்:</span></div>
-                <input className="line-input" name="pepRelationship" value={formData.pepRelationship} onChange={handleChange} />
-              </div>
+              {formData.isPEP === "Yes" && (
+                <div className="pep-specify">
+                  <label className="pep-specify-label">
+                    <div className="q-en">If Yes please specify the relationship:</div>
+                    <div className="q-si">ඔව් නම් කරුණාකර සම්බන්ධතාවය සඳහන් කරන්න:</div>
+                    <div className="q-ta">ஆம் என்றால் தயவுசெய்து உறவை குறிப்பிடுக:</div>
+                  </label>
+                  <textarea className="app-textarea" name="pepRelationship" value={formData.pepRelationship} onChange={handleChange} rows={3} placeholder="Specify relationship..." />
+                </div>
+              )}
             </div>
           </div>
         </section>
 
         {/* DECLARATION */}
         <section className="paper-section decl-section">
-          <p className="decl-p">I declare that the above information is true and warrant that I have made full disclosure of all matters relevant in any way whatsoever in this application. I authorize you to make any inquires as you deem necessary for credit assessment or confirmation of the above particulars from the banks, auditors, Credit Information Bureau (CRIB), Department for Registration of Persons and any other parties or any other source.</p>
-          <p className="decl-p decl-si">ඉහත තොරතුරු සත්‍ය බවට මම ප්‍රකාශ කරන අතර, මෙම අයදුම්පතට නෛගේ හෝ අදාළ වන සියළු කරුණු සම්පූර්ණයෙන් හෙළි කර ඇති බව සහතික කෙරෙමි. ණය ආගමිකය, ගිණකම්කරුවන්, ණය තොරතුරු කාර්යාංශය (CRIB), පුද්ගලයන් ලියාපදිංචි කිරීමේ දෙපාර්තමේන්තුව හා වෙනත් ඕනෑම පාර්ශ්වයකින් හෝ වෙනත් ඕනෑ මූලාශ්‍රයකින් ඉහත විස්තරය ත්‍යාග කිරීමේ ඉමැසිලිකරු ඔබ අවශ්‍ය ව හිතන ඕනෑ ම විමසුම් කිරීමට මම ඔබට අවසර දෙමි.</p>
-          <p className="decl-p decl-ta">மேலே குறிப்பிட்ட தகவல்கள் உண்மை என்று நான் அறிவிக்கிறேன். இந்த விண்ணப்பத்தில் தொடர்புடைய அனைத்து விஷயங்களையும் முழுமையாக வெளிப்படுத்தியுள்ளேன் என்று உறுதிப்படுத்துகிறேன். கடன் மதிப்பீடு அல்லது மேற்கூறிய விவரங்களை உறுதிப்படுத்த வங்கிகள், கணக்காய்வாளர்கள், கடன் தகவல் பணியகம் (CRIB), ஆட்கள் பதிவு திணைக்களம் மற்றும் வேறு எந்த தரப்பினரிடமிருந்தும் நீங்கள் அவசியமென கருதும் விசாரணையையும் மேற்கொள்ள நான் உங்களுக்கு அதிகாரம் அளிக்கிறேன்.</p>
+          <div className="declaration-card">
+            <div className="declaration-block">I declare that the above information is true and warrant that I have made full disclosure of all matters relevant in any way whatsoever in this application. I authorize you to make any inquires as you deem necessary for credit assessment or confirmation of the above particulars from the banks, auditors, Credit Information Bureau (CRIB), Department for Registration of Persons and any other parties or any other source.</div>
+            <div className="declaration-block">මම ප්‍රකාශ කරමින් සිටිමි ඉහත තොරතුරු සත්‍ය බව සහ මෙම අයදුම්පතේ සම්බන්ධ සියලුම කාරණා පිළිබඳ සම්පූර්ණ විවෘත කිරීමක් කර ඇති බවට සහතික කරමි. මම ඔබට ණය පිරිපහදුව කිරීමට හෝ ඉහත කරුණු තහවුරු කිරීම සඳහා බැංකු, විනිශ්චයකරුවන්, ණය තොරතුරු කාර්යාලය (CRIB), පුද්ගලයින් ලේඛනාගාරය සහ වෙනත් පාර්ටි වලින් හෝ වෙනත් මූලාශ්‍ර වලින් ඔබට අවශ්‍ය යමික පරීක්ෂණයක් කිරීමට අවසර දෙමි.</div>
+            <div className="declaration-block">நான் மேற்கண்ட தகவல்கள் உண்மை என்பதைப் பிரகடனம் செய்கிறேன் மற்றும் இந்த விண்ணப்பத்தில் எந்த வகையிலும் தொடர்புடைய அனைத்து விஷயங்களையும் முழுமையாக வெளிப்படுத்தியுள்ளேன் என்பதை உத்தரவாதம் செய்கிறேன். கடன் மதிப்பீடு அல்லது மேற்கண்ட விவரங்களை உறுதிப்படுத்துவதற்காக வங்கிகள், தணிக்கையாளர்கள், கடன் தகவல் அலுவலகம் (CRIB), நபர்கள் பதிவு துறை மற்றும் பிற தரப்பினரிடமிருந்து அல்லது வேறு எந்த மூலத்திலிருந்தும் நீங்கள் தேவையெனக் கருதும் எந்த விசாரணையும் செய்ய உங்களுக்கு அனுமதி அளிக்கிறேன்.</div>
 
-          <p className="decl-p" style={{marginTop:12}}>I authorize Abans Finance PLC to register my facility and asset details in the Secured Transactions Register (STR).</p>
-          <p className="decl-p decl-si">අබාන්ස් ෆිනෑන්ස් පීඑල්සී වෙත, මගේ පහසුකම් සහ වත්කම් ප්‍රකාශිත ගනු දෙනු ලේඛනය (STR) ලියාපදිංචි කිරීමට මම බලය ගෙවීමි.</p>
-          <p className="decl-p decl-ta">எனது வசதி மற்றும் சொத்து விபரங்களை பிணையப்படுத்தப்பட்ட பரிவர்த்தனைகள் பதிவேட்டில் (STR) பதிவு செய்வதற்கு அபான்ஸ் ஃபைனான்ஸ் பீஎல்சி க்கு நான் அங்கீகாரம் அளிக்கிறேன்.</p>
+            <div className="declaration-block">I authorize Abans Finance PLC to register my facility and asset details in the Secured Transactions Register (STR).</div>
+            <div className="declaration-block">අබාන්ස් පොළී සීමිටඩ්ට මගේ පහසුකම් සහ වතු විස්තර ආරක්ෂිත ගනුදෙනු ලේඛනාගාරයේ (STR) ලියාපදිංචි කිරීමට මම අවසර දෙමි.</div>
+            <div className="declaration-block">அபான்ஸ் பைனான்ஸ் பிஎல்சி-க்கு எனது வசதி மற்றும் சொத்து விவரங்களை பாதுகாப்பான பரிவர்த்தனை பதிவேட்டில் (STR) பதிவு செய்ய அனுமதி அளிக்கிறேன்.</div>
 
-          <p className="decl-p" style={{marginTop:12}}>This application remains the property of Abans Finance PLC even if the Lease / Loan facility is not granted. Abans Finance PLC reserves the right to reject the application at its sole discretion, without stating reasons.</p>
-          <p className="decl-p decl-si">අදාළ ලීසිං හෝ ණය පහසුකම් ලබා දෙනු ලැබිය හෝ නොලැබිය ද, මෙම අයදුම්පත සිමාසහිත අබාන්ස් ෆිනෑන්ස් පීඑල්සී ශ්‍රේෂ්ඨ සේවාවේ තත්ව ද, කාරණු නොදක්වා ශ්‍රේෂ්ඨ සේවාවට ශ්‍රේෂ්ඨ සේවාව.</p>
-          <p className="decl-p decl-ta">இக்குத்தகை வசதியானது அபான்ஸ் பைனான்ஸ் பி.எல்.சி கம்பனியினால் நிராகரிக்கப்படட்டாலும் இவ்விண்ணப்பத்தாரமது அபான்ஸ் பைனான்ஸ் பி.எல்.சி கம்பனியின் உடைமையாகும். இவ்விண்ணப்பத்திரத்தை காரணங்கள் குறிப்பிடாமல் நிராகரிக்கப்படலும் அபான்ஸ் பைனான்ஸ் பி.எல்.சி கம்பனிக்கு முழுமை அதிகாரமுண்டு.</p>
+            <div className="declaration-block">This application remains the property of Abans Finance PLC even if the Lease / Loan facility is not granted. Abans Finance PLC reserves the right to reject the application at its sole discretion, without stating reasons.</div>
+            <div className="declaration-block">මෙම අයදුම්පත කුලියට / ණය පහසුකම් නොලැබුණත් අබාන්ස් පොළී සීමිටඩ්ගේ දේපළ වනවා. අබාන්ස් පොළී සීමිටඩ්ට මෙම අයදුම්පත ප්‍රතික්ෂේප කිරීමේ අයිතිය ඇති අතර, හේතු ප්‍රකාශ නොකරමින් එය කිරීමට ඇති අයිතිය ඇත.</div>
+            <div className="declaration-block">இந்த விண்ணப்பம் குத்தகை / கடன் வசதி வழங்கப்படாவிட்டாலும் அபான்ஸ் பைனான்ஸ் பிஎல்சி-யின் சொத்தாக இருக்கும். அபான்ஸ் பைனான்ஸ் பிஎல்சி-க்கு இந்த விண்ணப்பத்தை நிராகரிக்கும் உரிமை உள்ளது, மேலும் காரணங்களை குறிப்பிடாமல் அதைச் செய்யும் உரிமை உள்ளது.</div>
+          </div>
         </section>
 
         {/* SIGNATURE */}
@@ -774,7 +2323,7 @@ const handleSubmit = async (e) => {
               <div className="sig-lbl">Name <span className="q-si">නම</span> <span className="q-ta">பெயர்</span></div>
             </div>
             <div className="sig-col sig-date">
-              <div className="sig-lbl">Date <span className="q-si">දිනය</span> <span className="q-ta">திகதி</span></div>
+              <div className="sig-lbl">Date <span className="q-si">දිනය</span> <span className="q-ta">தேதி</span></div>
               <input
                 type="date"
                 className="sig-date-input"
