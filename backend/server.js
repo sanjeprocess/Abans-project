@@ -1813,6 +1813,39 @@ app.get('/api/applications/:id', async (req, res) => {
   }
 });
 
+// GET /api/workhub-trigger?applicationId=...&workhubCardId=...
+app.get('/api/workhub-trigger', async (req, res) => {
+  try {
+    const applicationId = req.query.applicationId;
+    const workhubCardId = req.query.workhubCardId;
+
+    if (!applicationId || !workhubCardId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required query params applicationId and workhubCardId'
+      });
+    }
+
+    const doc = await Application.findOne({
+      applicationId: applicationId.toString().trim().toUpperCase(),
+      workhubCardId: workhubCardId.toString().trim(),
+    });
+
+    if (!doc) {
+      return res.status(404).json({ success: false, error: 'No application found matching both values' });
+    }
+
+    return res.json({
+      success: true,
+      applicationId: doc.applicationId,
+      workhubCardId: doc.workhubCardId,
+      application: doc,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // PUT /api/update/:applicationId — update an existing WorkHub24 card by stored cardId
 app.put('/api/update/:applicationId', async (req, res) => {
   try {
