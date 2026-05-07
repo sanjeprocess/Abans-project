@@ -2,7 +2,7 @@
 (async () => {
   try {
     console.log("🧪 Testing token refresh endpoint...\n");
-    const response = await fetch("http://localhost:3003/api/debug/token-info", {
+    const response = await fetch("http://http://localhost:3003/api/debug/token-info", {
       method: "GET",
       headers: { "Content-Type": "application/json" }
     });
@@ -12,7 +12,7 @@
     console.log(JSON.stringify(data, null, 2));
     
     console.log("\n🧪 Testing refresh endpoint...\n");
-    const refreshResponse = await fetch("http://localhost:3003/api/debug/refresh-token", {
+    const refreshResponse = await fetch("http://http://localhost:3003/api/debug/refresh-token", {
       method: "GET",
       headers: { "Content-Type": "application/json" }
     });

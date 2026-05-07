@@ -5,14 +5,14 @@
     
     // Test 1: Check initial token status
     console.log("1️⃣  Checking initial token status...");
-    let response = await fetch("http://localhost:3003/api/debug/token-info");
+    let response = await fetch("http://http://localhost:3003/api/debug/token-info");
     let tokenInfo = await response.json();
     console.log(`   Token expires: ${tokenInfo.exp}`);
     console.log(`   Is expired: ${tokenInfo.isExpired}\n`);
     
     // Test 2: Force refresh
     console.log("2️⃣  Forcing token refresh...");
-    response = await fetch("http://localhost:3003/api/debug/refresh-token");
+    response = await fetch("http://http://localhost:3003/api/debug/refresh-token");
     let refreshResult = await response.json();
     console.log(`   Refresh success: ${refreshResult.success}`);
     console.log(`   New expiry: ${refreshResult.tokenExp}`);
@@ -20,7 +20,7 @@
     
     // Test 3: Call actual workflow endpoint (will use refreshed token)
     console.log("3️⃣  Testing actual API endpoint with refreshed token...");
-    response = await fetch("http://localhost:3003/api/debug/token-info");
+    response = await fetch("http://http://localhost:3003/api/debug/token-info");
     tokenInfo = await response.json();
     console.log(`   Token type: ${tokenInfo.typ}`);
     console.log(`   Is expired: ${tokenInfo.isExpired}`);
