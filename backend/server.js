@@ -2270,6 +2270,57 @@ app.get('/api/customer/:applicationId', async (req, res) => {
   }
 });
 
+app.get('/api/customer-details', async (req, res) => {
+  try {
+    const applicationId = req.query.applicationId;
+    const workhubCardId = req.query.workhubCardId;
+
+    console.log('[CUSTOMER-DETAILS] applicationId=', applicationId, 'workhubCardId=', workhubCardId);
+
+    if (!applicationId || !workhubCardId) {
+      return res.json({
+        success: false,
+        message: 'Missing applicationId or workhubCardId'
+      });
+    }
+
+    const cardIdNumber = Number(workhubCardId);
+    if (Number.isNaN(cardIdNumber)) {
+      return res.json({
+        success: false,
+        message: 'Customer details not found'
+      });
+    }
+
+    const application = await Application.findOne({
+      applicationId: applicationId.toString().trim().toUpperCase(),
+      workhubCardId: cardIdNumber,
+    });
+
+    if (!application) {
+      return res.json({
+        success: false,
+        message: 'Customer details not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Customer details found',
+      customerId: application._id,
+      applicationId: application.applicationId,
+      workhubCardId: application.workhubCardId,
+      data: application,
+    });
+  } catch (err) {
+    console.error('[CUSTOMER-DETAILS] Error:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
 module.exports = app;
 if (process.env.NODE_ENV !== "production") {
   const startServer = (port) => {
