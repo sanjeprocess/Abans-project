@@ -38,10 +38,10 @@ const DATASTORES = {
 // ⚠️  Must be a fresh ACCESS token (typ:"access"), NOT a refresh token.
 // Get it from WorkHub → top-right profile → Copy Access Token
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN || process.env.AUTH_TOKEN ||
-  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg0Njk3MjIsImlhdCI6MTc3ODQ2OTAwMiwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiIxYWI0OTk3MC0wN2E1LTQ1YWItODVkNC00MmI1YWFkNTdkYmEiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NDY5MDAxLCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiUVRFVkM1RzY3SkpKNUM0QVNNREdFU0VRSzdHN01JRkhFVEhaMkxaTyIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJhY2Nlc3MiLCJ1bmFtZSI6InRoIn0.03KVB2LYFop6pc22KvZThEZdRgzk22_VjODISylgLeGBZa1C6Qj_aRAsQnr8RvIDfZjLu4lolvCIZ-ClYqHHXw";
+  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg0NzE0OTgsImlhdCI6MTc3ODQ3MDc3OCwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiJhOTkxMTE3OC05NDM5LTQxYTMtYjZjNS1kNzk2ODMwMmIxZTYiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NDcwNzc3LCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiRzVWR1o0NjZXRUQ2VkdaM0g3RjJUWkZYVUJFRzZOT0VNSDVXTkxSSiIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJhY2Nlc3MiLCJ1bmFtZSI6InRoIn0.t5Vu-aeI6vVqTFfodEBhh86-qciW8-CLHqt0Uvpfxh3od9iEjG2sovLopY9kpTQrJdtbtfvkhM6y3eF2Jk-vmw";
 
 const REFRESH_TOKEN = process.env.REFRESH_TOKEN || process.env.WH_REFRESH_TOKEN ||
-  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg1MDUwMDIsImlhdCI6MTc3ODQ2OTAwMiwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiIxNWI4MTgwMC0yODQ3LTRmMzQtYmRjOS1kNDg4NDMwNDdjOGEiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NDY5MDAxLCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiUVRFVkM1RzY3SkpKNUM0QVNNREdFU0VRSzdHN01JRkhFVEhaMkxaTyIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJyZWZyZXNoIiwidW5hbWUiOiJ0aCJ9.FyV9wbnRn2KusEQz7ba6J5YQfh7Ym70OVrNZ6P1hknfXV85iT6aQrSsWSmOEv3ldJm56h313b04YognIatsnPA";
+  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg1MDY3NzgsImlhdCI6MTc3ODQ3MDc3OCwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiJhMjBmNTc3Yy1lZDJjLTQ0ZjktODE2MS0xYTM3ZDQyM2ZhNjYiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NDcwNzc3LCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiRzVWR1o0NjZXRUQ2VkdaM0g3RjJUWkZYVUJFRzZOT0VNSDVXTkxSSiIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJyZWZyZXNoIiwidW5hbWUiOiJ0aCJ9.KZ7yAUYqDQrICYgMEDMZcyg0EHWaojvUsHCvf1CNV7dGw3HdpPeqVAUIdUIaosPRTG5yocNUU-G54S6LGyb-9Q";
 const TOKEN_EXPIRY_LEEWAY_SECONDS = 60;
 
 let currentAccessToken = ACCESS_TOKEN;
@@ -154,19 +154,31 @@ if (initialTokenInfo) {
   console.error("❌ Failed to parse ACCESS_TOKEN JWT payload");
 }
 
-const allowedOrigins = [
+const allowedOrigins = new Set([
+  "http://13.53.79.153",
+  "http://13.53.79.153:3003",
   "http://localhost:5173",
   "http://localhost:3000",
   "https://abance-testing.vercel.app",
   "https://abance-frontend.vercel.app",
   "https://abance-backend-v2.vercel.app",
-];
-app.use(cors({
-  origin: (origin, cb) => (!origin || allowedOrigins.includes(origin)) ? cb(null, true) : cb(new Error("Not allowed by CORS")),
+]);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.has(origin)) return callback(null, true);
+    return callback(new Error(`CORS origin denied: ${origin}`));
+  },
   credentials: true,
-  methods: ["GET", "POST", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-}));
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+};
+
+app.options("*", cors(corsOptions));
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2321,23 +2333,19 @@ app.get('/api/customer-details', async (req, res) => {
   }
 });
 
-module.exports = app;
-if (process.env.NODE_ENV !== "production") {
-  const startServer = (port) => {
-    const server = app.listen(port, () => {
-      console.log(`\nAbans Finance backend → http://localhost:${port}`);
-    });
-    
-    server.on("error", (err) => {
-      if (err.code === "EADDRINUSE") {
-        console.warn(`⚠️ Port ${port} is in use. Trying port ${port + 1}...`);
-        startServer(port + 1);
-      } else {
-        console.error("Server error:", err);
-        process.exit(1);
-      }
-    });
-  };
-  
-  startServer(PORT);
-}
+const startServer = (port) => {
+  const server = app.listen(port, "0.0.0.0", () => {
+    console.log(`\nAbans Finance backend → http://localhost:${port}`);
+  });
+
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+      console.warn(`⚠️ Port ${port} is in use. Trying port ${port + 1}...`);
+      startServer(port + 1);
+    } else {
+      console.error("Server error:", err);
+      process.exit(1);
+    }
+  });
+};
+startServer(PORT);

@@ -1,6 +1,6 @@
 ﻿import React, { useState } from "react";
 import "./ApplicationForm.css";
-import { API_BASE_URL } from "../config";
+import { buildApiUrl, safeFetch } from "../config";
 
 const ThankYouPage = ({ onRestart, signingLink }) => (
   <div className="thank-you-container">
@@ -301,7 +301,8 @@ const handleSubmit = async (e) => {
       guarantors: formData.guarantors
     });
 
-    const response = await fetch(`${API_BASE_URL}/api/submit-application`, {
+    const endpoint = buildApiUrl("/api/submit-application");
+    const response = await safeFetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
