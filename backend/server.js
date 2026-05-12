@@ -154,6 +154,20 @@ if (initialTokenInfo) {
   console.error("❌ Failed to parse ACCESS_TOKEN JWT payload");
 }
 
+// Refresh token if expired on startup
+if (initialTokenInfo && initialTokenInfo.isExpired) {
+  console.log('🔄 Refreshing expired access token on startup...');
+  (async () => {
+    try {
+      await refreshAccessToken();
+      console.log('✅ Access token refreshed successfully on startup');
+    } catch (err) {
+      console.error('❌ Failed to refresh access token on startup:', err.message);
+      console.warn('Proceeding with expired token; API calls may fail');
+    }
+  })();
+}
+
 const allowedOrigins = new Set([
   "http://13.53.79.153",
   "http://13.53.79.153:3003",
@@ -263,21 +277,70 @@ function authHeaders() {
   };
 }
 
-// Extract any URL from a response object, checking priority keys first
-const extractUrlFromResponse = (obj) => {
-  if (!obj || typeof obj !== 'object') return null;
-  const priorityKeys = ['signingLink', 'signUrl', 'formUrl', 'redirectUrl', 'documentUrl', 'shareLink', 'link', 'url', 'webUrl', 'publicUrl', 'accessUrl'];
-  for (const key of priorityKeys) {
-    if (obj[key] && (obj[key].toString().startsWith('http://') || obj[key].toString().startsWith('https://'))) {
-      return obj[key];
-    }
+// Deep recursive URL extractor — finds Stella Sign URLs anywhere in any response shape.
+// Priority: stellasign.com URLs first, then any https:// URL from known signing key names,
+// then any https:// URL found recursively in the object tree.
+const extractUrlFromResponse = (obj, _depth = 0) => {
+  if (!obj || _depth > 10) return null;
+
+  if (typeof obj === 'string') {
+    if (obj.startsWith('https://demo.stellasign.com/') || obj.startsWith('https://stellasign.com/')) return obj;
+    if (obj.startsWith('https://') || obj.startsWith('http://')) return obj;
+    return null;
   }
-  // Check all other keys
-  for (const [key, val] of Object.entries(obj)) {
-    if (val && typeof val === 'string' && (val.startsWith('http://') || val.startsWith('https://'))) {
+
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const found = extractUrlFromResponse(item, _depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  if (typeof obj !== 'object') return null;
+
+  const stellaKeys = Object.keys(obj);
+  for (const key of stellaKeys) {
+    const val = obj[key];
+    if (typeof val === 'string' &&
+        (val.startsWith('https://demo.stellasign.com/') || val.startsWith('https://stellasign.com/'))) {
+      console.log(`[extractUrl] ✅ Stella Sign URL found at key "${key}": ${val}`);
       return val;
     }
   }
+
+  const priorityKeys = [
+    'signingLink', 'signing_link', 'signUrl', 'sign_url',
+    'formUrl',     'form_url',     'redirectUrl', 'redirect_url',
+    'documentUrl', 'document_url', 'shareLink',   'share_link',
+    'link',        'url',          'webUrl',       'web_url',
+    'publicUrl',   'public_url',   'accessUrl',    'access_url',
+    'signLink',    'signatureUrl', 'signature_url','docUrl',
+    'href',        'location',     'endpoint',
+  ];
+  for (const key of priorityKeys) {
+    if (obj[key] && typeof obj[key] === 'string' &&
+        (obj[key].startsWith('https://') || obj[key].startsWith('http://'))) {
+      console.log(`[extractUrl] Found URL at priority key "${key}": ${obj[key]}`);
+      return obj[key];
+    }
+  }
+
+  for (const [key, val] of Object.entries(obj)) {
+    if (typeof val === 'string' &&
+        (val.startsWith('https://') || val.startsWith('http://'))) {
+      console.log(`[extractUrl] Found URL at key "${key}": ${val}`);
+      return val;
+    }
+  }
+
+  for (const [key, val] of Object.entries(obj)) {
+    if (val && typeof val === 'object') {
+      const found = extractUrlFromResponse(val, _depth + 1);
+      if (found) return found;
+    }
+  }
+
   return null;
 };
 
@@ -615,11 +678,13 @@ function buildWorkflowCardScalars(f) {
   const gu2 = (f.guarantors || [])[1] || {};
 
   const payload = {
-    title:                          s(f.fullName),
-    fullName:                       s(f.fullName),
-    applicationId:                  s(f.applicationId),
-    workhubCardId:                  s(f.workhubCardId),
-    nicNo:                          s(f.nicNo),
+    // ── IDs MUST BE FIRST ─────────────────────────────
+    applicationId:  (f.applicationId  || '').toString(),
+    workhubCardId:  (f.workhubCardId  || '').toString(),
+    // ── existing fields below — DO NOT CHANGE ─────────
+    title:          s(f.fullName),
+    fullName:       s(f.fullName),
+    nicNo:          s(f.nicNo),
     mobile1:                        s(f.mobile1),
     mobile2:                        n(f.mobile2),
     email:                          s(f.email),
@@ -694,7 +759,6 @@ function buildWorkflowCardScalars(f) {
     pepRelationship:                s(f.pepRelationship),
     signatureName:                  s(f.signatureName),
     signatureDate:                  d(f.signatureDate),
-    applicationId:                  s(f.applicationId),
     guarantorName1:                 s(gu1.fullName),
     guarantorRelationship1:         s(gu1.relationship),
     guarantorNIC1:                  s(gu1.nicBusinessRegNo),
@@ -836,7 +900,11 @@ async function createWorkflowCard(formData) {
 
     const res = await fetch(url, {
       method: "POST",
-      headers: authHeaders(),
+      headers: {
+        ...authHeaders(),
+        "X-Application-Id": s(formData.applicationId),
+        "X-WorkHub-Card-Id": s(formData.workhubCardId),
+      },
       body: JSON.stringify(fullPayload),
     });
     const text = await res.text();
@@ -1685,22 +1753,29 @@ app.post("/api/submit-application", async (req, res) => {
     console.log("\n=== SUBMIT APPLICATION ===");
     console.log(`fullName: ${formData.fullName}`);
 
-    // STEP 1 — generate applicationId FIRST (before anything else)
+    // STEP 1 — Generate BOTH IDs first (before anything else)
     const applicationId = await generateApplicationId();
-    console.log(`[SUBMIT] generated applicationId: ${applicationId}`);
-
     const workhubCardId = await generateWorkhubCardId();
-    console.log(`[SUBMIT] generated workhubCardId: ${workhubCardId}`);
 
-    // STEP 2 — create WorkHub24 card with both IDs in the payload
-    const workflowPayload = { ...formData, applicationId, workhubCardId };
+    console.log('[SUBMIT] applicationId :', applicationId);
+    console.log('[SUBMIT] workhubCardId :', workhubCardId);
 
-    console.log("[WORKHUB PAYLOAD IDS]", {
+    // STEP 2 — Inject BOTH IDs into the payload sent to WorkHub24
+    const workflowPayload = {
+      ...formData,
+      applicationId,
+      workhubCardId,
+    };
+
+    console.log('[SUBMIT] workflowPayload IDs check:', {
       applicationId: workflowPayload.applicationId,
       workhubCardId: workflowPayload.workhubCardId,
     });
 
+    // STEP 3 — Save to datastore with both IDs
     const datastoreResult = await saveApplicationToDatastore(workflowPayload);
+
+    // STEP 4 — Create WorkHub24 card with both IDs in body
     const workflowCardResult = await createWorkflowCard(workflowPayload);
 
     if (!workflowCardResult.ok) {
@@ -1732,27 +1807,139 @@ app.post("/api/submit-application", async (req, res) => {
       });
     }
 
-    // STEP 5 — save to MongoDB with both IDs
-    let mongoSaveResult = { ok: false, id: null, applicationId: null, workhubCardId: null, error: null };
+    let mongoSaveResult = {
+      ok: false, id: null,
+      applicationId: null,
+      workhubCardId: null,
+      error: null,
+    };
+
+    const toNum  = (v) => (v === '' || v == null) ? null : Number(v) || null;
+    const toStr  = (v) => Array.isArray(v) ? v.join(', ') : (v ?? '').toString();
+    const toDate = (v) => {
+      if (!v || v === '') return null;
+      if (typeof v === 'string' && /^\d{8}$/.test(v)) {
+        return new Date(
+          parseInt(v.slice(0,4)),
+          parseInt(v.slice(4,6)) - 1,
+          parseInt(v.slice(6,8))
+        );
+      }
+      const d = new Date(v);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
+    let cleanDoc = {};
+
     try {
-        const mongoDoc = new Application({
+      cleanDoc = {
         ...formData,
-        applicationId,
-        workhubCardId,
+
+        // IDs — always strings
+        applicationId:  applicationId.toString(),
+        workhubCardId:  workhubCardId.toString(),
+
+        // Dates
+        dateOfBirth:    toDate(formData.dateOfBirth),
+        signatureDate:  toDate(formData.signatureDate),
+
+        // Arrays → strings
+        qualifications: toStr(formData.qualifications),
+        fundSources:    toStr(formData.fundSources),
+
+        // Numbers — empty string → null
+        yearsAtAbove:          toNum(formData.yearsAtAbove),
+        monthsAtAbove:         toNum(formData.monthsAtAbove),
+        noOfChildren:          toNum(formData.noOfChildren),
+        childAge1:             toNum(formData.childAge1),
+        childAge2:             toNum(formData.childAge2),
+        childAge3:             toNum(formData.childAge3),
+        totalDependants:       toNum(formData.totalDependants),
+        incomeMainSalary:      toNum(formData.incomeMainSalary),
+        incomeOtherAllowances: toNum(formData.incomeOtherAllowances),
+        incomeAdditional:      toNum(formData.incomeAdditional),
+        incomeOther:           toNum(formData.incomeOther),
+        expenseHousehold:      toNum(formData.expenseHousehold),
+        expensePersonal:       toNum(formData.expensePersonal),
+        expenseLoanLease:      toNum(formData.expenseLoanLease),
+        expenseCreditCard:     toNum(formData.expenseCreditCard),
+        expenseFuel:           toNum(formData.expenseFuel),
+        expenseOther:          toNum(formData.expenseOther),
+
+        // Clean guarantors array — convert age/months to null if empty
+        guarantors: (formData.guarantors || []).map(g => ({
+          ...g,
+          age:    toNum(g.age),
+          months: toNum(g.months),
+        })),
+
         submittedAt: new Date(),
-      });
+      };
+
+      console.log('[MONGO] Saving — applicationId:', applicationId,
+                  '| workhubCardId:', workhubCardId);
+
+      const mongoDoc = new Application(cleanDoc);
       const savedDoc = await mongoDoc.save();
+
       mongoSaveResult = {
-        ok: true,
-        id: savedDoc._id,
+        ok:            true,
+        id:            savedDoc._id,
         applicationId: savedDoc.applicationId,
         workhubCardId: savedDoc.workhubCardId,
-        error: null,
+        error:         null,
       };
-      console.log(`✅ [SUBMIT] saved MongoDB with applicationId and workhubCardId: ${savedDoc.applicationId}, ${savedDoc.workhubCardId}`);
+
+      console.log('✅ [MONGO] Saved:', savedDoc.applicationId,
+                  '|', savedDoc.workhubCardId);
+
     } catch (mongoErr) {
-      mongoSaveResult.error = mongoErr.message;
-      console.error("❌ [SUBMIT] STEP5 MongoDB error:", mongoErr.message);
+      console.error('❌ [MONGO] name    :', mongoErr.name);
+      console.error('❌ [MONGO] message :', mongoErr.message);
+      if (mongoErr.errors) {
+        Object.entries(mongoErr.errors).forEach(([field, err]) => {
+          console.error(`   ↳ "${field}": ${err.message} | value: "${err.value}"`);
+        });
+      }
+      if (mongoErr.code === 11000) {
+        console.error('❌ [MONGO] Duplicate key error:', mongoErr.keyValue);
+      }
+      console.error('❌ [MONGO] stack:', mongoErr.stack?.slice(0, 400));
+
+      mongoSaveResult.error = {
+        name:    mongoErr.name,
+        code:    mongoErr.code,
+        message: mongoErr.message,
+        fields:  mongoErr.errors
+          ? Object.fromEntries(
+              Object.entries(mongoErr.errors).map(([k,v]) => [k, v.message])
+            )
+          : null,
+        keyValue: mongoErr.keyValue || null,
+      };
+    }
+
+    // If duplicate key on applicationId, upsert instead
+    if (!mongoSaveResult.ok && mongoSaveResult.error?.code === 11000) {
+      console.warn('[MONGO] Duplicate key — trying upsert...');
+      try {
+        const upserted = await Application.findOneAndUpdate(
+          { applicationId: applicationId.toString() },
+          { $set: cleanDoc },
+          { new: true, upsert: true }
+        );
+        mongoSaveResult = {
+          ok:            true,
+          id:            upserted._id,
+          applicationId: upserted.applicationId,
+          workhubCardId: upserted.workhubCardId,
+          error:         null,
+        };
+        console.log('✅ [MONGO] Upserted:', upserted.applicationId);
+      } catch (upsertErr) {
+        console.error('❌ [MONGO] Upsert also failed:', upsertErr.message);
+        mongoSaveResult.error.upsertError = upsertErr.message;
+      }
     }
 
     // If WorkHub card was created but MongoDB save failed, surface a clear error
@@ -1783,22 +1970,92 @@ app.post("/api/submit-application", async (req, res) => {
     }
 
     // STEP 6 — get signing link
-    let signingLinkResult = { ok: false, signingLink: null, foundAt: null };
-    if (workflowCardResult.ok && workflowCardResult.cardId) {
-      signingLinkResult = await getWorkHub24FormLink(workflowCardResult.cardId);
+    let signingLink = null;
+    let signingLinkSource = null;
+
+    const cardResponseData = workflowCardResult.data || {};
+    signingLink = extractUrlFromResponse(cardResponseData);
+
+    if (!signingLink && cardResponseData.result) {
+      signingLink = extractUrlFromResponse(cardResponseData.result);
     }
+    if (!signingLink && cardResponseData.data) {
+      signingLink = extractUrlFromResponse(cardResponseData.data);
+    }
+
+    console.log('[SIGNING] From card creation response:', signingLink || 'none');
+
+    if (!signingLink && workflowCardResult.cardId) {
+      const ACTION_ID = process.env.WORKHUB24_SIGN_ACTION_ID;
+
+      if (ACTION_ID) {
+        const actionUrl = `${WH_BASE}/api/workflows/${TENANT_ID}/${WORKFLOW_ID}/cards/${workflowCardResult.cardId}/actions/${ACTION_ID}/execute`;
+        console.log('[SIGNING] Triggering Stella Sign action:', actionUrl);
+
+        for (const method of ['POST', 'GET']) {
+          try {
+            const opts = { method, headers: authHeaders() };
+            if (method === 'POST') opts.body = JSON.stringify({});
+
+            const actionRes = await fetch(actionUrl, opts);
+            const actionText = await actionRes.text();
+            let actionData = {};
+            try { actionData = JSON.parse(actionText); } catch {}
+
+            console.log(`[SIGNING] ${method} action → HTTP ${actionRes.status}`);
+            console.log(`[SIGNING] FULL response body:`);
+            console.log(JSON.stringify(actionData, null, 2));
+
+            const findUrl = (obj) => {
+              if (!obj || typeof obj !== 'object') return null;
+              for (const [key, val] of Object.entries(obj)) {
+                if (typeof val === 'string' && val.startsWith('https://')) return val;
+                if (typeof val === 'object') {
+                  const found = findUrl(val);
+                  if (found) return found;
+                }
+              }
+              return null;
+            };
+
+            signingLink = extractUrlFromResponse(actionData) || findUrl(actionData);
+            if (signingLink) {
+              console.log('[SIGNING] ✅ Found signing link:', signingLink);
+              signingLinkSource = `${method} action`;
+              break;
+            }
+          } catch (err) {
+            console.error(`[SIGNING] ${method} action error:`, err.message);
+          }
+        }
+      } else {
+        console.warn('[SIGNING] WORKHUB24_SIGN_ACTION_ID not set in .env');
+      }
+    }
+
+    if (!signingLink && workflowCardResult.cardId) {
+      console.log('[SIGNING] Trying getWorkHub24FormLink fallback...');
+      const linkResult = await getWorkHub24FormLink(workflowCardResult.cardId);
+      if (linkResult.signingLink) {
+        signingLink = linkResult.signingLink;
+        signingLinkSource = linkResult.foundAt || 'fallback';
+        console.log('[SIGNING] ✅ Fallback found:', signingLink);
+      }
+    }
+
+    console.log('[SIGNING] Final signing link:', signingLink || 'NOT FOUND');
 
     // STEP 7 — respond
     return res.status(201).json({
       success: workflowCardResult.ok && mongoSaveResult.ok,
-      message: "Application submitted successfully",
+      message: 'Application submitted successfully',
       applicationId,
       workhubCardId,
       workhubActualCardId,
       mongoId: mongoSaveResult.id,
-      signingLink: signingLinkResult.signingLink,
-      signingLinkFound: signingLinkResult.ok,
-      signingLinkSource: signingLinkResult.foundAt,
+      signingLink: signingLink || null,
+      signingLinkFound: Boolean(signingLink),
+      signingLinkSource,
       datastore: {
         ok: datastoreResult.ok,
         status: datastoreResult.status,
@@ -1821,6 +2078,67 @@ app.post("/api/submit-application", async (req, res) => {
       message: "Internal server error",
       error: { message: err.message },
     });
+  }
+});
+
+// TEST 1: MongoDB save in isolation with both IDs
+app.get('/api/test-mongo-save', async (_req, res) => {
+  try {
+    const applicationId = await generateApplicationId();
+    const workhubCardId = await generateWorkhubCardId();
+    const doc = new Application({
+      fullName:      'Test User',
+      nicNo:         '200012345678',
+      email:         'test@gmail.com',
+      mobile1:       '0771234567',
+      applicationId: applicationId,
+      workhubCardId: workhubCardId,
+      dateOfBirth:   null,
+      signatureDate: null,
+      submittedAt:   new Date(),
+    });
+    const saved = await doc.save();
+    return res.json({
+      success: true,
+      message: '✅ MongoDB save working',
+      savedId: saved._id,
+      applicationId: saved.applicationId,
+      workhubCardId: saved.workhubCardId,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: '❌ MongoDB save failed',
+      error: err.message,
+      name: err.name,
+      fields: err.errors
+        ? Object.fromEntries(
+            Object.entries(err.errors).map(([k,v]) => [k, v.message])
+          )
+        : null,
+    });
+  }
+});
+
+// TEST 2: Verify applicationId and workhubCardId are saved in MongoDB
+app.get('/api/test-check-ids/:applicationId', async (req, res) => {
+  try {
+    const doc = await Application.findOne({
+      applicationId: req.params.applicationId.toUpperCase(),
+    });
+    if (!doc) {
+      return res.status(404).json({ success: false, error: 'Not found' });
+    }
+    return res.json({
+      success: true,
+      applicationId: doc.applicationId,
+      workhubCardId: doc.workhubCardId,
+      mongoId: doc._id,
+      fullName: doc.fullName,
+      submittedAt: doc.submittedAt,
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -1957,6 +2275,142 @@ app.get('/api/workhub-trigger', async (req, res) => {
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/workhub-trigger', async (req, res) => {
+  try {
+    const { applicationId, workhubCardId } = req.body;
+
+    if (!applicationId || !workhubCardId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Both applicationId and workhubCardId are required in the request body'
+      });
+    }
+
+    const normalizedAppId = applicationId.toString().trim().toUpperCase();
+    const normalizedCardId = workhubCardId.toString().trim();
+
+    console.log(`\n[WH-TRIGGER] applicationId=${normalizedAppId} workhubCardId=${normalizedCardId}`);
+
+    const doc = await Application.findOne({
+      applicationId: normalizedAppId,
+      workhubCardId: normalizedCardId,
+    });
+
+    if (!doc) {
+      return res.status(404).json({
+        success: false,
+        error: `No application found matching applicationId="${normalizedAppId}" and workhubCardId="${normalizedCardId}"`,
+        hint: 'Both IDs must match the same document. Check /api/search?id=<applicationId> to verify.'
+      });
+    }
+
+    console.log(`[WH-TRIGGER] Found: ${doc.fullName} (mongo _id: ${doc._id})`);
+
+    await ensureValidToken();
+
+    const workhubNumericCardId = doc.workhubCardId;
+    console.log(`[WH-TRIGGER] Pushing data to WorkHub24 card ${workhubNumericCardId}...`);
+
+    const updateResult = await updateWorkflowCard(workhubNumericCardId, doc.toObject());
+    console.log(`[WH-TRIGGER] WorkHub24 update → HTTP ${updateResult.status}`);
+
+    if (!updateResult.ok && updateResult.status !== 403) {
+      return res.status(502).json({
+        success: false,
+        error: `Failed to push data to WorkHub24: ${updateResult.error}`,
+        applicationId: normalizedAppId,
+        workhubCardId: normalizedCardId,
+      });
+    }
+
+    if (updateResult.status === 403) {
+      console.warn('[WH-TRIGGER] WorkHub24 update blocked (403) — card may be in locked stage. Proceeding to sign trigger anyway.');
+    }
+
+    const ACTION_ID = process.env.WORKHUB24_SIGN_ACTION_ID;
+    let signingLink = null;
+    let signingLinkSource = null;
+
+    if (ACTION_ID) {
+      const actionUrl = `${WH_BASE}/api/workflows/${TENANT_ID}/${WORKFLOW_ID}/cards/${workhubNumericCardId}/actions/${ACTION_ID}/execute`;
+      console.log(`[WH-TRIGGER] Triggering Stella Sign: ${actionUrl}`);
+
+      for (const method of ['POST', 'GET']) {
+        try {
+          const opts = { method, headers: authHeaders() };
+          if (method === 'POST') opts.body = JSON.stringify({});
+          const actionRes = await fetch(actionUrl, opts);
+          const actionText = await actionRes.text();
+          let actionData = {};
+          try { actionData = JSON.parse(actionText); } catch {}
+          console.log(`[WH-TRIGGER POST] ${method} action → HTTP ${actionRes.status}`);
+          console.log(`[WH-TRIGGER POST] FULL response body:`);
+          console.log(JSON.stringify(actionData, null, 2));
+          console.log(`[WH-TRIGGER POST] Raw text (first 1000 chars): ${actionText.slice(0, 1000)}`);
+
+          const findUrl = (obj) => {
+            if (!obj || typeof obj !== 'object') return null;
+            for (const [, val] of Object.entries(obj)) {
+              if (typeof val === 'string' && val.startsWith('https://')) return val;
+              if (typeof val === 'object') { const f = findUrl(val); if (f) return f; }
+            }
+            return null;
+          };
+
+          signingLink = extractUrlFromResponse(actionData) || findUrl(actionData);
+          if (signingLink) {
+            signingLinkSource = `${method} action (ACTION_ID: ${ACTION_ID})`;
+            console.log(`[WH-TRIGGER] ✅ Signing link found: ${signingLink}`);
+            break;
+          }
+        } catch (err) {
+          console.error(`[WH-TRIGGER] ${method} action error: ${err.message}`);
+        }
+      }
+    } else {
+      console.warn('[WH-TRIGGER] WORKHUB24_SIGN_ACTION_ID not set in .env — skipping sign trigger');
+    }
+
+    if (!signingLink) {
+      console.log('[WH-TRIGGER] Trying getWorkHub24FormLink fallback...');
+      const fallback = await getWorkHub24FormLink(workhubNumericCardId);
+      if (fallback.signingLink) {
+        signingLink = fallback.signingLink;
+        signingLinkSource = fallback.foundAt || 'fallback endpoint probe';
+        console.log(`[WH-TRIGGER] ✅ Fallback signing link: ${signingLink}`);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      applicationId: normalizedAppId,
+      workhubCardId: normalizedCardId,
+      mongoId: doc._id,
+      signingLink: signingLink || null,
+      signingLinkFound: Boolean(signingLink),
+      signingLinkSource: signingLinkSource || null,
+      workhubDataPush: {
+        ok:     updateResult.ok,
+        status: updateResult.status,
+        error:  updateResult.error || null,
+      },
+      customer: {
+        fullName:  doc.fullName,
+        nicNo:     doc.nicNo,
+        email:     doc.email,
+        mobile1:   doc.mobile1,
+      },
+    });
+
+  } catch (err) {
+    console.error('[WH-TRIGGER] Unhandled error:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 });
 
@@ -2435,6 +2889,48 @@ app.get('/api/customer-details', async (req, res) => {
   }
 });
 
+app.post('/api/customer-details', async (req, res) => {
+  try {
+    const { applicationId, workhubCardId } = req.body;
+
+    console.log('[CUSTOMER-DETAILS] applicationId=', applicationId, 'workhubCardId=', workhubCardId);
+
+    if (!applicationId || !workhubCardId) {
+      return res.json({
+        success: false,
+        message: 'Missing applicationId or workhubCardId'
+      });
+    }
+
+    const application = await Application.findOne({
+      applicationId,
+      workhubCardId: Number(workhubCardId)
+    });
+
+    if (!application) {
+      return res.json({
+        success: false,
+        message: 'Customer details not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Customer details found',
+      customerId: application._id,
+      applicationId: application.applicationId,
+      workhubCardId: application.workhubCardId,
+      data: application
+    });
+  } catch (err) {
+    console.error('[CUSTOMER-DETAILS] Error:', err.message);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
 app.get("/api/debug/verify-card-ids/:cardId", async (req, res) => {
   try {
     const { cardId } = req.params;
@@ -2501,6 +2997,80 @@ app.get("/api/debug/verify-card-ids/:cardId", async (req, res) => {
         title:         cardData2.title,
         allFields:     Object.keys(cardData2),
       },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// TEST 1: Test MongoDB save in isolation
+app.get('/api/test-mongo-save', async (_req, res) => {
+  try {
+    const testId = `ABF-TEST-${Date.now()}`;
+    const testDoc = new Application({
+      fullName:      'MongoDB Test User',
+      nicNo:         '200012345678',
+      email:         'test@gmail.com',
+      mobile1:       '0771234567',
+      applicationId: testId,
+      workhubCardId: `WH-TEST-${Date.now()}`,
+      dateOfBirth:   null,
+      signatureDate: null,
+      submittedAt:   new Date(),
+    });
+    const saved = await testDoc.save();
+    return res.json({ 
+      success: true, 
+      message: 'MongoDB save working correctly',
+      savedId: saved._id,
+      applicationId: saved.applicationId,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+      name: err.name,
+      fields: err.errors
+        ? Object.fromEntries(
+            Object.entries(err.errors).map(([k,v]) => [k, v.message])
+          )
+        : null,
+    });
+  }
+});
+
+// TEST 2: Test signing link retrieval for an existing card
+app.get('/api/test-signing-link/:cardId', async (req, res) => {
+  try {
+    const { cardId } = req.params;
+    await ensureValidToken();
+
+    const ACTION_ID = process.env.WORKHUB24_SIGN_ACTION_ID;
+    const results = [];
+
+    if (ACTION_ID) {
+      const actionUrl = `${WH_BASE}/api/workflows/${TENANT_ID}/${WORKFLOW_ID}/cards/${cardId}/actions/${ACTION_ID}/execute`;
+      for (const method of ['POST', 'GET']) {
+        const opts = { method, headers: authHeaders() };
+        if (method === 'POST') opts.body = JSON.stringify({});
+        const r = await fetch(actionUrl, opts);
+        const text = await r.text();
+        let data = {}; try { data = JSON.parse(text); } catch {}
+        const url = extractUrlFromResponse(data);
+        results.push({ method, status: r.status, signingLink: url, raw: text.slice(0,300) });
+        if (url) break;
+      }
+    }
+
+    const fallback = await getWorkHub24FormLink(cardId);
+    results.push({ method: 'FALLBACK', signingLink: fallback.signingLink, foundAt: fallback.foundAt });
+
+    const found = results.find(r => r.signingLink);
+    return res.json({
+      success: Boolean(found),
+      cardId,
+      signingLink: found?.signingLink || null,
+      allAttempts: results,
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });

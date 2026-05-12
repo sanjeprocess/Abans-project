@@ -2,40 +2,54 @@
 import "./ApplicationForm.css";
 import { buildApiUrl, safeFetch } from "../config";
 
-const ThankYouPage = ({ onRestart, signingLink }) => (
-  <div className="thank-you-container">
-    <div className="thank-you-card">
-      <div className="success-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
+const ThankYouPage = ({ onRestart, signingLink }) => {
+  React.useEffect(() => {
+    if (signingLink) {
+      const timer = setTimeout(() => {
+        window.open(signingLink, '_blank');
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [signingLink]);
+
+  return (
+    <div className="thank-you-container">
+      <div className="thank-you-card">
+        <div className="success-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <h1 className="thank-you-title">Thank You</h1>
+        <p className="thank-you-message">
+          Thank you for choosing Abans Finance.
+          <br />
+          Your application is under review and we will contact you immediately.
+        </p>
+        {signingLink && (
+          <div className="signing-section">
+            <p className="signing-note">
+              📄 Please sign your application document to complete the process.
+            </p>
+            <button
+              className="thank-you-button signing-btn"
+              onClick={() => window.open(signingLink, '_blank')}
+              style={{ background: '#28a745', marginBottom: '12px' }}
+            >
+              Open Signing Document
+            </button>
+            <p style={{ fontSize: '13px', color: '#666', marginBottom: '16px' }}>
+              Link: <a href={signingLink} target="_blank" rel="noreferrer">{signingLink}</a>
+            </p>
+          </div>
+        )}
+        <button className="thank-you-button" onClick={onRestart}>
+          Submit Another Application
+        </button>
       </div>
-      <h1 className="thank-you-title">Thank You</h1>
-      <p className="thank-you-message">
-        Thank you for choosing Abans Finance.
-        <br />
-        Your application is under review and we will contact you immediately.
-      </p>
-      {signingLink && (
-        <>
-          <button 
-            className="thank-you-button" 
-            onClick={() => window.open(signingLink, '_blank')}
-            style={{ background: '#28a745', marginBottom: '12px' }}
-          >
-            Open Signing Document
-          </button>
-          <p style={{ fontSize: '14px', color: '#666', marginBottom: '16px' }}>
-            Click above to sign your application document
-          </p>
-        </>
-      )}
-      <button className="thank-you-button" onClick={onRestart}>
-        Submit Another Application
-      </button>
     </div>
-  </div>
-);
+  );
+};
 
 const emptyCreditRow = { institution: "", type: "", approvedAmount: "", term: "", monthlyRepayment: "", presentOS: "", security: "" };
 const emptyBankRow = { bank: "", branch: "", accountNo: "", officer: "", telephone: "" };
@@ -142,6 +156,7 @@ function ApplicationForm() {
   const [errors, setErrors] = useState({});
   const [isSubmittedSuccessfully, setIsSubmittedSuccessfully] = useState(false);
   const [signingLink, setSigningLink] = useState(null);
+  const [showWaitingOverlay, setShowWaitingOverlay] = useState(false);
 
   const validateNumberInput = (value) => {
     const cleaned = value.replace(/[^0-9]/g, "");
@@ -293,7 +308,8 @@ const handleSubmit = async (e) => {
   e.preventDefault();
   setSubmitted(false);
   setApiStatus("loading");
-  setApiMessage("Connecting to API...");
+  setShowWaitingOverlay(true);
+  setApiMessage("Please wait...\nYour application is being submitted.\nPreparing your signing document...");
 
   try {
     console.log("Sending payload:", {
@@ -333,25 +349,42 @@ const handleSubmit = async (e) => {
     }
 
     setApiStatus("success");
-    setApiMessage("API connection successful. Application submitted.");
     setSubmitted(true);
     
     // Handle signing link if available
     if (data.signingLink) {
-      setApiMessage("✅ Application submitted! Opening your document...");
+      const isStellaSigned = data.signingLink.includes('stellasign.com');
+      const linkLabel = isStellaSigned ? 'Stella Sign document' : 'signing document';
+
+      setApiMessage(`✅ Application submitted! Opening ${linkLabel}...`);
       setSigningLink(data.signingLink);
-      
-      // Wait 1.5 seconds then open the signing link and show thank you page
+      setApiStatus('success');
+
       setTimeout(() => {
-        window.open(data.signingLink, '_blank');
+        const newTab = window.open(data.signingLink, '_blank');
+
+        if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
+          setApiMessage(
+            `✅ Submitted! Your browser blocked the auto-open.\nClick the button below to open your signing document.`
+          );
+          // Keep overlay visible so the manual button remains available
+          return;
+        }
+
+        setShowWaitingOverlay(false);
         setIsSubmittedSuccessfully(true);
-      }, 1500);
+      }, 1200);
     } else {
-      // No signing link — just show thank you page
-      setIsSubmittedSuccessfully(true);
+      console.warn('[FRONTEND] No signing link in API response — showing thank you page directly');
+      setApiMessage('✅ Application submitted successfully!');
+      setTimeout(() => {
+        setShowWaitingOverlay(false);
+        setIsSubmittedSuccessfully(true);
+      }, 800);
     }
   } catch (error) {
     console.error("API submit error:", error);
+    setShowWaitingOverlay(false);
     setApiStatus("error");
     setApiMessage("API connection unsuccessfully. " + error.message);
     setSubmitted(false);
@@ -362,6 +395,7 @@ const handleSubmit = async (e) => {
     setSubmitted(false);
     setApiStatus("idle");
     setApiMessage("");
+    setShowWaitingOverlay(false);
   };
 
   const handleRestartApplication = () => {
@@ -387,6 +421,73 @@ const handleSubmit = async (e) => {
 
   return (
     <>
+    {showWaitingOverlay && (
+      <div className="waiting-overlay">
+        <div className="waiting-content">
+          {apiStatus === 'loading' && <div className="waiting-spinner"></div>}
+
+          {apiStatus === 'success' && (
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              background: '#e6f4ea',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px'
+            }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+                   stroke="#28a745" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+          )}
+
+          {apiMessage.split('\n').map((line, i) => (
+            <p key={i} style={{ margin: '4px 0', fontSize: 15 }}>{line}</p>
+          ))}
+
+          {signingLink && apiStatus === 'success' && (
+            <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                onClick={() => {
+                  window.open(signingLink, '_blank');
+                  setShowWaitingOverlay(false);
+                  setIsSubmittedSuccessfully(true);
+                }}
+                style={{
+                  background: '#28a745', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '12px 28px', fontSize: 15,
+                  fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3,
+                }}
+              >
+                📄 Open Signing Document
+              </button>
+              <button
+                onClick={() => {
+                  setShowWaitingOverlay(false);
+                  setIsSubmittedSuccessfully(true);
+                }}
+                style={{
+                  background: 'transparent', color: '#666', border: '1px solid #ccc',
+                  borderRadius: 8, padding: '8px 20px', fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Skip — go to thank you page
+              </button>
+              <p style={{ fontSize: 12, color: '#999', margin: 0 }}>
+                Link: <a href={signingLink} target="_blank" rel="noreferrer"
+                         style={{ color: '#1a73e8', wordBreak: 'break-all' }}>
+                  {signingLink}
+                </a>
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
     <div className="abans-page-bg">
       <form className="abans-paper" onSubmit={handleSubmit}>
 
@@ -2317,14 +2418,11 @@ const handleSubmit = async (e) => {
           <div className="sig-grid">
             <div className="sig-col">
               <div className="sig-line"></div>
-              <div className="sig-lbl">Signature <span className="q-si">අත්සන</span> <span className="q-ta">கையொப்பம்</span></div>
             </div>
             <div className="sig-col sig-name">
-              <input className="sig-name-input" name="signatureName" value={formData.signatureName} onChange={handleChange} placeholder="Full name..." />
-              <div className="sig-lbl">Name <span className="q-si">නම</span> <span className="q-ta">பெயர்</span></div>
+              <input className="sig-name-input" name="signatureName" value={formData.signatureName} onChange={handleChange} />
             </div>
             <div className="sig-col sig-date">
-              <div className="sig-lbl">Date <span className="q-si">දිනය</span> <span className="q-ta">தேதி</span></div>
               <input
                 type="date"
                 className="sig-date-input"
@@ -2339,7 +2437,7 @@ const handleSubmit = async (e) => {
         {/* FORM ACTIONS */}
         <div className="form-actions">
           <button type="button" className="paper-btn secondary" onClick={handleReset}>Clear Form</button>
-          <button type="submit" className="paper-btn primary">Submit</button>
+          <button type="submit" className="paper-btn primary" disabled={apiStatus === "loading"}>Submit</button>
         </div>
 
         {apiStatus === "loading" && <div className="submit-note" style={{ color: "#1a73e8" }}>{apiMessage}</div>}
