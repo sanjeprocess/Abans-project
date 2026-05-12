@@ -38,10 +38,10 @@ const DATASTORES = {
 // ⚠️  Must be a fresh ACCESS token (typ:"access"), NOT a refresh token.
 // Get it from WorkHub → top-right profile → Copy Access Token
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN || process.env.AUTH_TOKEN ||
-  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg0NzE0OTgsImlhdCI6MTc3ODQ3MDc3OCwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiJhOTkxMTE3OC05NDM5LTQxYTMtYjZjNS1kNzk2ODMwMmIxZTYiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NDcwNzc3LCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiRzVWR1o0NjZXRUQ2VkdaM0g3RjJUWkZYVUJFRzZOT0VNSDVXTkxSSiIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJhY2Nlc3MiLCJ1bmFtZSI6InRoIn0.t5Vu-aeI6vVqTFfodEBhh86-qciW8-CLHqt0Uvpfxh3od9iEjG2sovLopY9kpTQrJdtbtfvkhM6y3eF2Jk-vmw";
+  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg1NTY1MzksImlhdCI6MTc3ODU1NTgxOSwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiIyMTg5ZjEyYy1mODE5LTQ0NTEtYmM3Ni1lM2U4N2RjYTU1N2QiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NTU1ODE4LCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiTkM2N1FZNllET0s0WlMzQklCWU9SVUZRWlhZTDNSRllWTVpXRUJZSCIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJhY2Nlc3MiLCJ1bmFtZSI6InRoIn0.SjZJ9Pl92Vnez-7dJTboZLZ29taQL310t6nkHYr3ddnxI8_sX4e4n7axV9oYLhzw3OzL8ajY3eLtrwxqHEQ7FQ";
 
 const REFRESH_TOKEN = process.env.REFRESH_TOKEN || process.env.WH_REFRESH_TOKEN ||
-  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg1MDY3NzgsImlhdCI6MTc3ODQ3MDc3OCwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiJhMjBmNTc3Yy1lZDJjLTQ0ZjktODE2MS0xYTM3ZDQyM2ZhNjYiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NDcwNzc3LCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiRzVWR1o0NjZXRUQ2VkdaM0g3RjJUWkZYVUJFRzZOT0VNSDVXTkxSSiIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJyZWZyZXNoIiwidW5hbWUiOiJ0aCJ9.KZ7yAUYqDQrICYgMEDMZcyg0EHWaojvUsHCvf1CNV7dGw3HdpPeqVAUIdUIaosPRTG5yocNUU-G54S6LGyb-9Q";
+  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg1OTE4MTksImlhdCI6MTc3ODU1NTgxOSwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiJkY2Y4MDcwMS0zNGQxLTRlMzctOTNjMS04Yzg4ZDBhMzcwY2QiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NTU1ODE4LCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiTkM2N1FZNllET0s0WlMzQklCWU9SVUZRWlhZTDNSRllWTVpXRUJZSCIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJyZWZyZXNoIiwidW5hbWUiOiJ0aCJ9.gV3BFSklaFyds7iitNa-n-d-SnTQRglKDa1BgoAphr0gnelVaA-_pSOyLc3SNiN-SWAmyDTqTr6M3sX-vk-iJw";
 const TOKEN_EXPIRY_LEEWAY_SECONDS = 60;
 
 let currentAccessToken = ACCESS_TOKEN;
@@ -205,8 +205,27 @@ function normalizeYesNo(v) {
 function normalizeBranchArea(v) {
   const str = (v || "").toString();
   if (str === "Yes") return "yes";
-  if (str === "No")  return "No";
+  if (str === "No")  return "no";
   return str;
+}
+
+function normalizeResidentialStatus(v) {
+  const map = {
+    "Own":          "own",
+    "Rented":       "rented",
+    "Mortgaged":    "mortgaged",
+    "With parents": "with parents",
+  };
+  return map[(v || "").toString()] || (v || "").toString().toLowerCase();
+}
+
+function normalizePreferredLanguage(v) {
+  const map = {
+    "Sinhala": "sinhala",
+    "Tamil":   "tamil",
+    "English": "english",
+  };
+  return map[(v || "").toString()] || (v || "").toString().toLowerCase();
 }
 
 const TURNOVER_INDIVIDUAL_MAP = {
@@ -322,7 +341,22 @@ async function generateApplicationId() {
     { new: true, upsert: true }
   );
   const padded = String(counter.seq).padStart(5, '0');
-  return `ABF-${year}-${padded}`;
+  const id = `ABF-${year}-${padded}`;
+  console.log(`[generateApplicationId] generated: ${id}`);
+  return id;
+}
+
+async function generateWorkhubCardId() {
+  const year = new Date().getFullYear();
+  const counter = await Counter.findOneAndUpdate(
+    { name: 'workhubCardId' },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+  const padded = String(counter.seq).padStart(5, '0');
+  const id = `WH-${year}-${padded}`;
+  console.log(`[generateWorkhubCardId] generated: ${id}`);
+  return id;
 }
 
 async function updateWorkflowCard(cardId, formData) {
@@ -583,13 +617,15 @@ function buildWorkflowCardScalars(f) {
   const payload = {
     title:                          s(f.fullName),
     fullName:                       s(f.fullName),
+    applicationId:                  s(f.applicationId),
+    workhubCardId:                  s(f.workhubCardId),
     nicNo:                          s(f.nicNo),
     mobile1:                        s(f.mobile1),
     mobile2:                        n(f.mobile2),
     email:                          s(f.email),
     emailaddress:                   s(f.email),
     gender:                         s(f.gender),
-    residentialStatus:              s(f.residentialStatus),
+    residentialStatus:              normalizeResidentialStatus(f.residentialStatus),
     permanentAddress:               s(f.permanentAddress),
     mailingAddress:                 s(f.mailingAddress),
     maritalStatus:                  s(f.maritalStatus),
@@ -645,7 +681,7 @@ function buildWorkflowCardScalars(f) {
     lifeInsuranceSpecify:           s(f.lifeInsuranceSpecify),
     deposits:                       normalizeYesNo(f.deposits),
     depositsSpecify:                s(f.depositsSpecify),
-    preferredLanguage:              s(f.preferredLanguage),
+    preferredLanguage:              normalizePreferredLanguage(f.preferredLanguage),
     fundSources:                    normalizeFundSources(f.fundSources),
     annualTurnoverIndividual:       normalizeTurnover(f.annualTurnoverIndividual, TURNOVER_INDIVIDUAL_MAP),
     annualTurnoverBusiness:         normalizeTurnover(f.annualTurnoverBusiness,   TURNOVER_BUSINESS_MAP),
@@ -658,6 +694,7 @@ function buildWorkflowCardScalars(f) {
     pepRelationship:                s(f.pepRelationship),
     signatureName:                  s(f.signatureName),
     signatureDate:                  d(f.signatureDate),
+    applicationId:                  s(f.applicationId),
     guarantorName1:                 s(gu1.fullName),
     guarantorRelationship1:         s(gu1.relationship),
     guarantorNIC1:                  s(gu1.nicBusinessRegNo),
@@ -1647,25 +1684,58 @@ app.post("/api/submit-application", async (req, res) => {
 
     console.log("\n=== SUBMIT APPLICATION ===");
     console.log(`fullName: ${formData.fullName}`);
-    console.log(`bankDetails: ${(formData.bankDetails||[]).length} rows`);
-    console.log(`creditFacilities: ${(formData.creditFacilities||[]).length} rows`);
-    console.log(`vehicles: ${(formData.vehicles||[]).length} rows`);
-    console.log(`landBuildings: ${(formData.landBuildings||[]).length} rows`);
-    console.log(`shares: ${(formData.shares||[]).length} rows`);
-    console.log(`facilityRequirements: ${(formData.facilityRequirements||[]).length} rows`);
-    console.log(`guarantors: ${(formData.guarantors||[]).length} rows`);
 
-    const [datastoreResult, workflowCardResult] = await Promise.all([
-      saveApplicationToDatastore(formData),
-      createWorkflowCard(formData),
-    ]);
+    // STEP 1 — generate applicationId FIRST (before anything else)
+    const applicationId = await generateApplicationId();
+    console.log(`[SUBMIT] generated applicationId: ${applicationId}`);
 
-    // Save to MongoDB with unique applicationId and workhubCardId
-    let mongoSaveResult = { ok: false, id: null, applicationId: null, error: null };
+    const workhubCardId = await generateWorkhubCardId();
+    console.log(`[SUBMIT] generated workhubCardId: ${workhubCardId}`);
+
+    // STEP 2 — create WorkHub24 card with both IDs in the payload
+    const workflowPayload = { ...formData, applicationId, workhubCardId };
+
+    console.log("[WORKHUB PAYLOAD IDS]", {
+      applicationId: workflowPayload.applicationId,
+      workhubCardId: workflowPayload.workhubCardId,
+    });
+
+    const datastoreResult = await saveApplicationToDatastore(workflowPayload);
+    const workflowCardResult = await createWorkflowCard(workflowPayload);
+
+    if (!workflowCardResult.ok) {
+      return res.status(502).json({
+        success: false,
+        message: "WorkHub workflow card creation failed",
+        applicationId,
+        workhubCardId,
+        workflowError: workflowCardResult,
+      });
+    }
+
+    const workhubActualCardId =
+      workflowCardResult.cardId ||
+      workflowCardResult.data?.id ||
+      workflowCardResult.raw?.id ||
+      workflowCardResult.response?.id ||
+      null;
+
+    console.log("[SUBMIT] WorkHub actual card id:", workhubActualCardId);
+
+    if (!workhubActualCardId) {
+      return res.status(502).json({
+        success: false,
+        message: "WorkHub card created but card id was not found in response",
+        applicationId,
+        workhubCardId,
+        workflowResult: workflowCardResult,
+      });
+    }
+
+    // STEP 5 — save to MongoDB with both IDs
+    let mongoSaveResult = { ok: false, id: null, applicationId: null, workhubCardId: null, error: null };
     try {
-      const applicationId = await generateApplicationId();
-      const workhubCardId = workflowCardResult.ok ? workflowCardResult.cardId : null;
-      const mongoDoc = new Application({
+        const mongoDoc = new Application({
         ...formData,
         applicationId,
         workhubCardId,
@@ -1679,46 +1749,78 @@ app.post("/api/submit-application", async (req, res) => {
         workhubCardId: savedDoc.workhubCardId,
         error: null,
       };
-      console.log('✅ MongoDB saved | applicationId:', savedDoc.applicationId, '| workhubCardId:', savedDoc.workhubCardId);
+      console.log(`✅ [SUBMIT] saved MongoDB with applicationId and workhubCardId: ${savedDoc.applicationId}, ${savedDoc.workhubCardId}`);
     } catch (mongoErr) {
-      mongoSaveResult = { ok: false, id: null, applicationId: null, error: mongoErr.message };
-      console.error('❌ MongoDB save error:', mongoErr.message);
+      mongoSaveResult.error = mongoErr.message;
+      console.error("❌ [SUBMIT] STEP5 MongoDB error:", mongoErr.message);
     }
 
-    console.log("DATASTORE:", JSON.stringify(datastoreResult, null, 2));
-    console.log("WORKFLOW:",  JSON.stringify(workflowCardResult, null, 2));
+    // If WorkHub card was created but MongoDB save failed, surface a clear error
+    if (workflowCardResult.ok && !mongoSaveResult.ok) {
+      return res.status(500).json({
+        success: false,
+        message: "MongoDB save failed after WorkHub card creation",
+        applicationId,
+        mongoId: null,
+        workhubCardId,
+        signingLink: null,
+        signingLinkFound: false,
+        signingLinkSource: null,
+        datastore: {
+          ok: datastoreResult.ok,
+          status: datastoreResult.status,
+          mainRecordId: datastoreResult.mainRecordId,
+          errors: datastoreResult.errors,
+        },
+        workflowCard: {
+          ok: workflowCardResult.ok,
+          status: workflowCardResult.status,
+          cardId: workflowCardResult.cardId,
+          error: workflowCardResult.error,
+        },
+        mongodb: mongoSaveResult,
+      });
+    }
 
-    // ── Get WorkHub24 signing link ──────────────────────────────────────────
+    // STEP 6 — get signing link
     let signingLinkResult = { ok: false, signingLink: null, foundAt: null };
     if (workflowCardResult.ok && workflowCardResult.cardId) {
       signingLinkResult = await getWorkHub24FormLink(workflowCardResult.cardId);
     }
-    // ────────────────────────────────────────────────────────────────────────
 
-    return res.json({
-      success: datastoreResult.ok || workflowCardResult.ok || mongoSaveResult.ok,
-      applicationId: mongoSaveResult.applicationId,
+    // STEP 7 — respond
+    return res.status(201).json({
+      success: workflowCardResult.ok && mongoSaveResult.ok,
+      message: "Application submitted successfully",
+      applicationId,
+      workhubCardId,
+      workhubActualCardId,
       mongoId: mongoSaveResult.id,
-      workhubCardId: mongoSaveResult.workhubCardId,
       signingLink: signingLinkResult.signingLink,
       signingLinkFound: signingLinkResult.ok,
       signingLinkSource: signingLinkResult.foundAt,
       datastore: {
-        ok: datastoreResult.ok, status: datastoreResult.status,
-        mainRecordId: datastoreResult.mainRecordId, errors: datastoreResult.errors,
+        ok: datastoreResult.ok,
+        status: datastoreResult.status,
+        mainRecordId: datastoreResult.mainRecordId,
+        errors: datastoreResult.errors,
       },
       workflowCard: {
-        ok:     workflowCardResult.ok,
+        ok: workflowCardResult.ok,
         status: workflowCardResult.status,
         cardId: workflowCardResult.cardId,
-        error:  workflowCardResult.error,
+        error: workflowCardResult.error,
       },
       mongodb: mongoSaveResult,
     });
+
   } catch (err) {
     console.error("Unhandled error:", err);
-    return res.status(500).json({ success: false, message: "Internal server error",
-      error: { message: err.message } });
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: { message: err.message },
+    });
   }
 });
 
@@ -2330,6 +2432,78 @@ app.get('/api/customer-details', async (req, res) => {
       success: false,
       message: err.message,
     });
+  }
+});
+
+app.get("/api/debug/verify-card-ids/:cardId", async (req, res) => {
+  try {
+    const { cardId } = req.params;
+    await ensureValidToken();
+    const whCardUrl = `${WH_BASE}/api/workflows/${TENANT_ID}/${WORKFLOW_ID}/cards/${cardId}`;
+
+    // GET current card state
+    const getRes = await fetch(whCardUrl, { method: "GET", headers: authHeaders() });
+    const getText = await getRes.text();
+    let cardData = {};
+    try { cardData = JSON.parse(getText); } catch {}
+
+    console.log(`[VERIFY] card ${cardId} current state:`, {
+      applicationId: cardData.applicationId,
+      workhubCardId: cardData.workhubCardId,
+      id:            cardData.id,
+      title:         cardData.title,
+    });
+
+    // Try PATCH with both field name variants
+    const patchVariants = [
+      { applicationId: "TEST-ABF-PATCH", workhubCardId: cardId.toString() },
+      { application_id: "TEST-ABF-PATCH2", workhub_card_id: cardId.toString() },
+      { appId: "TEST-ABF-PATCH3" },
+    ];
+
+    const patchResults = [];
+    for (const variant of patchVariants) {
+      const r = await fetch(whCardUrl, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify(variant),
+      });
+      const t = await r.text();
+      let d = {}; try { d = JSON.parse(t); } catch {}
+      patchResults.push({
+        payload: variant,
+        status: r.status,
+        ok: r.ok,
+        response: t.slice(0, 200),
+      });
+    }
+
+    // GET card again after patches
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const getRes2 = await fetch(whCardUrl, { method: "GET", headers: authHeaders() });
+    const getText2 = await getRes2.text();
+    let cardData2 = {};
+    try { cardData2 = JSON.parse(getText2); } catch {}
+
+    return res.json({
+      cardId,
+      before: {
+        applicationId: cardData.applicationId,
+        workhubCardId: cardData.workhubCardId,
+        id:            cardData.id,
+        title:         cardData.title,
+      },
+      patchResults,
+      after: {
+        applicationId: cardData2.applicationId,
+        workhubCardId: cardData2.workhubCardId,
+        id:            cardData2.id,
+        title:         cardData2.title,
+        allFields:     Object.keys(cardData2),
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
