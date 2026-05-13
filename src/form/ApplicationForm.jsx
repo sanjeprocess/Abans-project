@@ -378,22 +378,43 @@ const handleSubmit = async (e) => {
     let signingLinkResult = data.signingLink || null;
 
     if (!signingLinkResult && data.applicationId) {
-      const MAX_POLLS = 10;
-      const POLL_INTERVAL = 3000;
-      for (let attempt = 1; attempt <= MAX_POLLS; attempt += 1) {
-        await new Promise(r => setTimeout(r, POLL_INTERVAL));
-        console.log(`[POLL] attempt ${attempt} for ${data.applicationId}`);
-        try {
-          const pollRes = await safeFetch(buildApiUrl(`/api/customer/${data.applicationId}`));
-          const pollData = await pollRes.json();
-          if (pollData?.signingLink) {
-            signingLinkResult = pollData.signingLink;
-            console.log('[POLL] Signing link found', signingLinkResult);
-            break;
+      console.log(`[SIGN] Calling /api/sign/${data.applicationId} to get Stella Sign link...`);
+      try {
+        // Small delay to let WorkHub24 finish processing
+        await new Promise(r => setTimeout(r, 2000));
+        const signRes = await safeFetch(buildApiUrl(`/api/sign/${data.applicationId}`), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const signData = await signRes.json();
+        console.log('[SIGN] Response:', signData);
+        if (signData?.signingLink) {
+          signingLinkResult = signData.signingLink;
+          console.log('[SIGN] ✅ Signing link found:', signingLinkResult);
+        } else {
+          console.warn('[SIGN] No signing link returned. signingLinkFound:', signData?.signingLinkFound);
+          // Fallback: poll up to 3 times with 5s interval
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            await new Promise(r => setTimeout(r, 5000));
+            console.log(`[SIGN FALLBACK] Retry ${attempt}...`);
+            try {
+              const retryRes = await safeFetch(buildApiUrl(`/api/sign/${data.applicationId}`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+              });
+              const retryData = await retryRes.json();
+              if (retryData?.signingLink) {
+                signingLinkResult = retryData.signingLink;
+                console.log('[SIGN FALLBACK] ✅ Found on retry:', signingLinkResult);
+                break;
+              }
+            } catch (retryErr) {
+              console.warn(`[SIGN FALLBACK] Retry ${attempt} failed:`, retryErr.message);
+            }
           }
-        } catch (pollErr) {
-          console.warn(`[POLL] attempt ${attempt} failed:`, pollErr.message);
         }
+      } catch (signErr) {
+        console.error('[SIGN] Error calling /api/sign:', signErr.message);
       }
     }
 
