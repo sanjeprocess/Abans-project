@@ -12,6 +12,11 @@ const ThankYouPage = ({ onRestart, signingLink }) => {
     }
   }, [signingLink]);
 
+  const message = signingLink
+    ? 'Thank you for choosing Abans Finance.\nYour application is under review and we will contact you immediately.'
+    : 'Your application was submitted. Our team will contact you with the signing link.';
+  const messageLines = message.split('\n');
+
   return (
     <div className="thank-you-container">
       <div className="thank-you-card">
@@ -22,9 +27,12 @@ const ThankYouPage = ({ onRestart, signingLink }) => {
         </div>
         <h1 className="thank-you-title">Thank You</h1>
         <p className="thank-you-message">
-          Thank you for choosing Abans Finance.
-          <br />
-          Your application is under review and we will contact you immediately.
+          {messageLines.map((line, index) => (
+            <React.Fragment key={index}>
+              {line}
+              {index < messageLines.length - 1 && <br />}
+            </React.Fragment>
+          ))}
         </p>
         {signingLink && (
           <div className="signing-section">
@@ -151,12 +159,22 @@ const defaultFormData = {
 function ApplicationForm() {
   const [formData, setFormData] = useState(defaultFormData);
   const [submitted, setSubmitted] = useState(false);
-  const [apiStatus, setApiStatus] = useState("idle");
-  const [apiMessage, setApiMessage] = useState("");
   const [errors, setErrors] = useState({});
   const [isSubmittedSuccessfully, setIsSubmittedSuccessfully] = useState(false);
   const [signingLink, setSigningLink] = useState(null);
-  const [showWaitingOverlay, setShowWaitingOverlay] = useState(false);
+  const [loadingState, setLoadingState] = useState({
+    visible: false,
+    currentStep: 0,
+    steps: [
+      { id: 1, title: 'Submitting your application...', subtext: 'Please wait while we process your details', status: 'pending' },
+      { id: 2, title: 'Saving to WorkHub24...', subtext: 'Creating your application card', status: 'pending' },
+      { id: 3, title: 'Preparing your document...', subtext: 'Generating your Stella Sign document', status: 'pending' },
+      { id: 4, title: 'Almost ready!', subtext: 'Opening your signing document...', status: 'pending' },
+    ],
+    applicationId: null,
+    signingLink: null,
+    error: null,
+  });
 
   const validateNumberInput = (value) => {
     const cleaned = value.replace(/[^0-9]/g, "");
@@ -307,95 +325,131 @@ function ApplicationForm() {
 const handleSubmit = async (e) => {
   e.preventDefault();
   setSubmitted(false);
-  setApiStatus("loading");
-  setShowWaitingOverlay(true);
-  setApiMessage("Please wait...\nYour application is being submitted.\nPreparing your signing document...");
+  setLoadingState(prev => ({
+    ...prev,
+    visible: true,
+    currentStep: 1,
+    steps: prev.steps.map((s, i) => ({
+      ...s,
+      status: i === 0 ? 'active' : 'pending'
+    })),
+    applicationId: null,
+    signingLink: null,
+    error: null,
+  }));
 
   try {
-    console.log("Sending payload:", {
-      formData,
-      guarantors: formData.guarantors
+    console.log('[SUBMIT] Starting application submission');
+
+    const response = await safeFetch(buildApiUrl('/api/submit-application'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ formData })
     });
 
-    const endpoint = buildApiUrl("/api/submit-application");
-    const response = await safeFetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify({
-        formData,
-        guarantors: formData.guarantors || []
-      })
-    });
-
-    const text = await response.text();
-    console.log("Raw response text:", text);
-
-    let data = {};
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      throw new Error("Backend did not return valid JSON");
-    }
+    const data = await response.json();
+    console.log('[SUBMIT] API response', data);
 
     if (!response.ok || !data.success) {
-      throw new Error(
-        data?.error?.message ||
-        data?.message ||
-        "Submission failed"
-      );
+      throw new Error(data?.message || data?.error?.message || 'Submission failed');
     }
 
-    setApiStatus("success");
-    setSubmitted(true);
-    
-    // Handle signing link if available
-    if (data.signingLink) {
-      const isStellaSigned = data.signingLink.includes('stellasign.com');
-      const linkLabel = isStellaSigned ? 'Stella Sign document' : 'signing document';
+    setLoadingState(prev => ({
+      ...prev,
+      currentStep: 2,
+      applicationId: data.applicationId,
+      steps: prev.steps.map((s, i) => ({
+        ...s,
+        status: i === 0 ? 'done' : i === 1 ? 'active' : 'pending'
+      }))
+    }));
 
-      setApiMessage(`✅ Application submitted! Opening ${linkLabel}...`);
-      setSigningLink(data.signingLink);
-      setApiStatus('success');
+    await new Promise(r => setTimeout(r, 800));
 
-      setTimeout(() => {
-        const newTab = window.open(data.signingLink, '_blank');
+    setLoadingState(prev => ({
+      ...prev,
+      currentStep: 3,
+      steps: prev.steps.map((s, i) => ({
+        ...s,
+        status: i <= 1 ? 'done' : i === 2 ? 'active' : 'pending'
+      }))
+    }));
 
-        if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
-          setApiMessage(
-            `✅ Submitted! Your browser blocked the auto-open.\nClick the button below to open your signing document.`
-          );
-          // Keep overlay visible so the manual button remains available
-          return;
+    let signingLinkResult = data.signingLink || null;
+
+    if (!signingLinkResult && data.applicationId) {
+      const MAX_POLLS = 10;
+      const POLL_INTERVAL = 3000;
+      for (let attempt = 1; attempt <= MAX_POLLS; attempt += 1) {
+        await new Promise(r => setTimeout(r, POLL_INTERVAL));
+        console.log(`[POLL] attempt ${attempt} for ${data.applicationId}`);
+        try {
+          const pollRes = await safeFetch(buildApiUrl(`/api/customer/${data.applicationId}`));
+          const pollData = await pollRes.json();
+          if (pollData?.signingLink) {
+            signingLinkResult = pollData.signingLink;
+            console.log('[POLL] Signing link found', signingLinkResult);
+            break;
+          }
+        } catch (pollErr) {
+          console.warn(`[POLL] attempt ${attempt} failed:`, pollErr.message);
         }
-
-        setShowWaitingOverlay(false);
-        setIsSubmittedSuccessfully(true);
-      }, 1200);
-    } else {
-      console.warn('[FRONTEND] No signing link in API response — showing thank you page directly');
-      setApiMessage('✅ Application submitted successfully!');
-      setTimeout(() => {
-        setShowWaitingOverlay(false);
-        setIsSubmittedSuccessfully(true);
-      }, 800);
+      }
     }
+
+    setLoadingState(prev => ({
+      ...prev,
+      currentStep: 4,
+      signingLink: signingLinkResult,
+      steps: prev.steps.map((s, i) => ({
+        ...s,
+        status: i <= 2 ? 'done' : i === 3 ? 'active' : 'pending'
+      }))
+    }));
+
+    await new Promise(r => setTimeout(r, 1000));
+
+    setSigningLink(signingLinkResult);
+    if (signingLinkResult) {
+      console.log('[SUBMIT] Signing link ready, moving to ThankYouPage');
+      setLoadingState(prev => ({
+        ...prev,
+        currentStep: 5,
+        steps: prev.steps.map(s => ({ ...s, status: 'done' }))
+      }));
+    } else {
+      console.log('[SUBMIT] No signing link after polling; showing thank you page');
+    }
+
+    setIsSubmittedSuccessfully(true);
   } catch (error) {
-    console.error("API submit error:", error);
-    setShowWaitingOverlay(false);
-    setApiStatus("error");
-    setApiMessage("API connection unsuccessfully. " + error.message);
-    setSubmitted(false);
+    console.error('[SUBMIT] Error:', error);
+    setLoadingState(prev => ({
+      ...prev,
+      visible: true,
+      error: error.message,
+      steps: prev.steps.map((s, i) => ({
+        ...s,
+        status: i < prev.currentStep - 1 ? 'done'
+          : i === prev.currentStep - 1 ? 'error'
+          : 'pending'
+      }))
+    }));
   }
 };
+
   const handleReset = () => {
     setFormData(defaultFormData);
     setSubmitted(false);
-    setApiStatus("idle");
-    setApiMessage("");
-    setShowWaitingOverlay(false);
+    setLoadingState(prev => ({
+      ...prev,
+      visible: false,
+      currentStep: 0,
+      steps: prev.steps.map(step => ({ ...step, status: 'pending' })),
+      applicationId: null,
+      signingLink: null,
+      error: null,
+    }));
   };
 
   const handleRestartApplication = () => {
@@ -421,69 +475,57 @@ const handleSubmit = async (e) => {
 
   return (
     <>
-    {showWaitingOverlay && (
-      <div className="waiting-overlay">
-        <div className="waiting-content">
-          {apiStatus === 'loading' && <div className="waiting-spinner"></div>}
+    {loadingState.visible && (
+      <div className="loading-overlay">
+        <div className="loading-card">
+          <h2 className="loading-title">Processing Application</h2>
 
-          {apiStatus === 'success' && (
-            <div style={{
-              width: 56,
-              height: 56,
-              borderRadius: '50%',
-              background: '#e6f4ea',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px'
-            }}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
-                   stroke="#28a745" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+          {loadingState.applicationId && (
+            <div className="app-id-badge">
+              Application ID: {loadingState.applicationId}
             </div>
           )}
 
-          {apiMessage.split('\n').map((line, i) => (
-            <p key={i} style={{ margin: '4px 0', fontSize: 15 }}>{line}</p>
-          ))}
+          <div className="loading-steps">
+            {loadingState.steps.map((step) => (
+              <div key={step.id} className={`loading-step ${step.status}`}>
+                <div className="step-icon">
+                  {step.status === 'active' && <div className="spinner" />}
+                  {step.status === 'done' && <span className="checkmark">✓</span>}
+                  {step.status === 'error' && <span className="errormark">✕</span>}
+                  {step.status === 'pending' && <span className="pending-dot" />}
+                </div>
+                <div className="step-text">
+                  <div className="step-title">{step.title}</div>
+                  <div className="step-subtext">{step.subtext}</div>
+                </div>
+              </div>
+            ))}
+          </div>
 
-          {signingLink && apiStatus === 'success' && (
-            <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button
-                onClick={() => {
-                  window.open(signingLink, '_blank');
-                  setShowWaitingOverlay(false);
-                  setIsSubmittedSuccessfully(true);
-                }}
-                style={{
-                  background: '#28a745', color: '#fff', border: 'none',
-                  borderRadius: 8, padding: '12px 28px', fontSize: 15,
-                  fontWeight: 600, cursor: 'pointer', letterSpacing: 0.3,
-                }}
-              >
-                📄 Open Signing Document
+          <div className="progress-bar-wrap">
+            <div
+              className="progress-bar-fill"
+              style={{ width: `${(loadingState.currentStep / loadingState.steps.length) * 100}%` }}
+            />
+          </div>
+
+          {loadingState.error && (
+            <div className="loading-error">
+              <span>⚠️ {loadingState.error}</span>
+              <button onClick={() => setLoadingState(prev => ({ ...prev, visible: false }))}>
+                Close
               </button>
-              <button
-                onClick={() => {
-                  setShowWaitingOverlay(false);
-                  setIsSubmittedSuccessfully(true);
-                }}
-                style={{
-                  background: 'transparent', color: '#666', border: '1px solid #ccc',
-                  borderRadius: 8, padding: '8px 20px', fontSize: 13,
-                  cursor: 'pointer',
-                }}
-              >
-                Skip — go to thank you page
-              </button>
-              <p style={{ fontSize: 12, color: '#999', margin: 0 }}>
-                Link: <a href={signingLink} target="_blank" rel="noreferrer"
-                         style={{ color: '#1a73e8', wordBreak: 'break-all' }}>
-                  {signingLink}
-                </a>
-              </p>
             </div>
+          )}
+
+          {loadingState.signingLink && loadingState.currentStep >= 4 && (
+            <button
+              className="open-signing-btn"
+              onClick={() => window.open(loadingState.signingLink, '_blank')}
+            >
+              📄 Open Signing Document
+            </button>
           )}
         </div>
       </div>
@@ -2437,12 +2479,8 @@ const handleSubmit = async (e) => {
         {/* FORM ACTIONS */}
         <div className="form-actions">
           <button type="button" className="paper-btn secondary" onClick={handleReset}>Clear Form</button>
-          <button type="submit" className="paper-btn primary" disabled={apiStatus === "loading"}>Submit</button>
+          <button type="submit" className="paper-btn primary" disabled={loadingState.visible}>Submit</button>
         </div>
-
-        {apiStatus === "loading" && <div className="submit-note" style={{ color: "#1a73e8" }}>{apiMessage}</div>}
-        {apiStatus === "success" && <div className="submit-note" style={{ color: "#0b6623" }}>{apiMessage}</div>}
-        {apiStatus === "error" && <div className="submit-note" style={{ color: "#c62828" }}>{apiMessage}</div>}
 
       </form>
     </div>

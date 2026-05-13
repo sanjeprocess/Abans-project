@@ -38,10 +38,10 @@ const DATASTORES = {
 // ⚠️  Must be a fresh ACCESS token (typ:"access"), NOT a refresh token.
 // Get it from WorkHub → top-right profile → Copy Access Token
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN || process.env.AUTH_TOKEN ||
-  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg1NTY1MzksImlhdCI6MTc3ODU1NTgxOSwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiIyMTg5ZjEyYy1mODE5LTQ0NTEtYmM3Ni1lM2U4N2RjYTU1N2QiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NTU1ODE4LCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiTkM2N1FZNllET0s0WlMzQklCWU9SVUZRWlhZTDNSRllWTVpXRUJZSCIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJhY2Nlc3MiLCJ1bmFtZSI6InRoIn0.SjZJ9Pl92Vnez-7dJTboZLZ29taQL310t6nkHYr3ddnxI8_sX4e4n7axV9oYLhzw3OzL8ajY3eLtrwxqHEQ7FQ";
+  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg2NDM1MjIsImlhdCI6MTc3ODY0MjgwMiwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiI1YTdmYzc3YS0xYTJlLTQwYzgtYjg2Yy1hYTZiNzBmOGY0MWIiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NjQyODAxLCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiSUxFR1JFUTVFNEFOWVhIRjdIUFM0NUlZVUlEUUdaTDdHSTVBM1VaWCIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJhY2Nlc3MiLCJ1bmFtZSI6InRoIn0.usNybosd3R9VVmu_X65aQC8dlfBUZanJwiWZbjjGdu5ACv2EjxQ8eitO_CxnrI-Qo-hU97EnzLIs2MHK6FiamQ";
 
 const REFRESH_TOKEN = process.env.REFRESH_TOKEN || process.env.WH_REFRESH_TOKEN ||
-  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg1OTE4MTksImlhdCI6MTc3ODU1NTgxOSwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiJkY2Y4MDcwMS0zNGQxLTRlMzctOTNjMS04Yzg4ZDBhMzcwY2QiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NTU1ODE4LCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiTkM2N1FZNllET0s0WlMzQklCWU9SVUZRWlhZTDNSRllWTVpXRUJZSCIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJyZWZyZXNoIiwidW5hbWUiOiJ0aCJ9.gV3BFSklaFyds7iitNa-n-d-SnTQRglKDa1BgoAphr0gnelVaA-_pSOyLc3SNiN-SWAmyDTqTr6M3sX-vk-iJw";
+  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg2Nzg4MDIsImlhdCI6MTc3ODY0MjgwMiwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiI5MmU3YTU0OC1mMGQ0LTRkNGUtYWFmMy0yYTRmM2U5YjcxOTIiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NjQyODAxLCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiSUxFR1JFUTVFNEFOWVhIRjdIUFM0NUlZVUlEUUdaTDdHSTVBM1VaWCIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJyZWZyZXNoIiwidW5hbWUiOiJ0aCJ9.i4g925OSYk3jB5mBMqwJAJ9VQMDZTrex22UqMJ21J0oWAUJRB7NiMBCbL3-IRAOZZAcAd7cdiHKZXxzdAjDtLA";
 const TOKEN_EXPIRY_LEEWAY_SECONDS = 60;
 
 let currentAccessToken = ACCESS_TOKEN;
@@ -2077,6 +2077,303 @@ app.post("/api/submit-application", async (req, res) => {
       success: false,
       message: "Internal server error",
       error: { message: err.message },
+    });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK 1 — POST /api/submit-to-workhub
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.post("/api/submit-to-workhub", async (req, res) => {
+  try {
+    const formData = req.body.formData || req.body;
+
+    console.log("\n=== [SUBMIT-TO-WORKHUB] ===");
+
+    // STEP 1 — Validate required fields
+    if (!formData || !formData.fullName) {
+      console.log("[SUBMIT-TO-WORKHUB] ❌ Missing formData.fullName");
+      return res.status(400).json({
+        success: false,
+        message: "Missing required field: fullName",
+        step: "validation"
+      });
+    }
+
+    console.log(`[SUBMIT-TO-WORKHUB] Processing for: ${formData.fullName}`);
+
+    // STEP 2 — Generate both IDs
+    const applicationId = await generateApplicationId();
+    const workhubCardId = await generateWorkhubCardId();
+
+    console.log(`[SUBMIT-TO-WORKHUB] Generated IDs: applicationId=${applicationId}, workhubCardId=${workhubCardId}`);
+
+    // STEP 3 — Merge IDs into payload
+    const payload = {
+      ...formData,
+      applicationId,
+      workhubCardId,
+    };
+
+    // STEP 4 — Create WorkHub24 card
+    console.log(`[SUBMIT-TO-WORKHUB] Ensuring valid token...`);
+    await ensureValidToken();
+
+    console.log(`[SUBMIT-TO-WORKHUB] Creating WorkHub24 card...`);
+    const cardResult = await createWorkflowCard(payload);
+
+    if (!cardResult.ok) {
+      console.log(`[SUBMIT-TO-WORKHUB] ❌ Card creation failed: ${cardResult.error}`);
+      return res.status(502).json({
+        success: false,
+        message: "WorkHub24 card creation failed",
+        applicationId,
+        workhubCardId,
+        error: cardResult.error,
+        step: "createWorkflowCard"
+      });
+    }
+
+    const workhubActualCardId = cardResult.cardId;
+    console.log(`[SUBMIT-TO-WORKHUB] ✅ Card created: ${workhubActualCardId}`);
+
+    // STEP 5 — Get signing link (try multiple methods)
+    let signingLink = null;
+    let signingLinkSource = null;
+
+    // Method 1: Extract from card creation response
+    signingLink = extractUrlFromResponse(cardResult.data);
+    if (signingLink) {
+      signingLinkSource = "card_creation_response";
+      console.log(`[SUBMIT-TO-WORKHUB] ✅ Signing link from card response: ${signingLink}`);
+    }
+
+    // Method 2: POST then GET to Stella Sign action
+    if (!signingLink && process.env.WORKHUB24_SIGN_ACTION_ID) {
+      const ACTION_ID = process.env.WORKHUB24_SIGN_ACTION_ID;
+      const actionUrl = `${WH_BASE}/api/workflows/${TENANT_ID}/${WORKFLOW_ID}/cards/${workhubActualCardId}/actions/${ACTION_ID}/execute`;
+
+      console.log(`[SUBMIT-TO-WORKHUB] Ensuring valid token for signing action...`);
+      await ensureValidToken();
+
+      console.log(`[SUBMIT-TO-WORKHUB] Trying Stella Sign action: ${actionUrl}`);
+
+      for (const method of ['POST', 'GET']) {
+        try {
+          const opts = { method, headers: authHeaders() };
+          if (method === 'POST') opts.body = JSON.stringify({});
+
+          const actionRes = await fetch(actionUrl, opts);
+          const actionText = await actionRes.text();
+          let actionData = {};
+          try { actionData = JSON.parse(actionText); } catch {}
+
+          console.log(`[SUBMIT-TO-WORKHUB] ${method} action → HTTP ${actionRes.status}`);
+
+          signingLink = extractUrlFromResponse(actionData);
+          if (signingLink) {
+            signingLinkSource = `${method}_action`;
+            console.log(`[SUBMIT-TO-WORKHUB] ✅ Signing link from ${method} action: ${signingLink}`);
+            break;
+          }
+        } catch (err) {
+          console.error(`[SUBMIT-TO-WORKHUB] ${method} action error: ${err.message}`);
+        }
+      }
+    }
+
+    // Method 3: Fallback to getWorkHub24FormLink
+    if (!signingLink) {
+      console.log(`[SUBMIT-TO-WORKHUB] Trying fallback getWorkHub24FormLink...`);
+      const fallbackResult = await getWorkHub24FormLink(workhubActualCardId);
+      if (fallbackResult.signingLink) {
+        signingLink = fallbackResult.signingLink;
+        signingLinkSource = "fallback";
+        console.log(`[SUBMIT-TO-WORKHUB] ✅ Signing link from fallback: ${signingLink}`);
+      }
+    }
+
+    console.log(`[SUBMIT-TO-WORKHUB] Final signing link: ${signingLink || 'NOT FOUND'}`);
+
+    // STEP 6 — Return response
+    return res.status(201).json({
+      success: true,
+      applicationId,
+      workhubCardId,
+      workhubActualCardId,
+      signingLink: signingLink || null,
+      signingLinkFound: Boolean(signingLink),
+      signingLinkSource,
+    });
+
+  } catch (err) {
+    console.error("[SUBMIT-TO-WORKHUB] Unhandled error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: { message: err.message },
+      step: "unhandled"
+    });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK 2 — POST /api/trigger-signing
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.post("/api/trigger-signing", async (req, res) => {
+  try {
+    const { applicationId, workhubCardId } = req.body;
+
+    console.log("\n=== [TRIGGER-SIGNING] ===");
+
+    // STEP 1 — Validate required fields
+    if (!applicationId || !workhubCardId) {
+      console.log("[TRIGGER-SIGNING] ❌ Missing applicationId or workhubCardId");
+      return res.status(400).json({
+        success: false,
+        message: "Both applicationId and workhubCardId are required",
+        step: "validation"
+      });
+    }
+
+    // STEP 2 — Normalize inputs
+    const normalizedAppId = applicationId.toUpperCase();
+    const normalizedCardId = workhubCardId.toString().trim();
+
+    console.log(`[TRIGGER-SIGNING] Normalized: applicationId=${normalizedAppId}, workhubCardId=${normalizedCardId}`);
+
+    // STEP 3 — Query MongoDB
+    console.log(`[TRIGGER-SIGNING] Querying MongoDB...`);
+    const normalizedCardNumber = Number(normalizedCardId);
+    const query = {
+      applicationId: normalizedAppId,
+      $or: [{ workhubCardId: normalizedCardId }]
+    };
+    if (!Number.isNaN(normalizedCardNumber)) {
+      query.$or.push({ workhubCardId: normalizedCardNumber });
+    }
+
+    const doc = await Application.findOne(query);
+
+    if (!doc) {
+      console.log(`[TRIGGER-SIGNING] ❌ Not found in MongoDB`);
+      return res.status(404).json({
+        success: false,
+        message: `Application not found: applicationId="${normalizedAppId}", workhubCardId="${normalizedCardId}"`,
+        hint: "Ensure both IDs match an existing application. Check the IDs are correct.",
+        step: "mongodb_query"
+      });
+    }
+
+    console.log(`[TRIGGER-SIGNING] ✅ Found: ${doc.fullName} (mongoId: ${doc._id})`);
+
+    // STEP 4 — Ensure valid token
+    console.log(`[TRIGGER-SIGNING] Ensuring valid token...`);
+    await ensureValidToken();
+
+    // STEP 5 — Update WorkHub24 card
+    console.log(`[TRIGGER-SIGNING] Updating WorkHub24 card ${doc.workhubCardId}...`);
+    const updateResult = await updateWorkflowCard(doc.workhubCardId, doc.toObject());
+
+    if (!updateResult.ok && updateResult.status !== 403) {
+      console.log(`[TRIGGER-SIGNING] ❌ Update failed: ${updateResult.error}`);
+      return res.status(502).json({
+        success: false,
+        message: `Failed to update WorkHub24 card: ${updateResult.error}`,
+        applicationId: normalizedAppId,
+        workhubCardId: normalizedCardId,
+        error: updateResult.error,
+        step: "updateWorkflowCard"
+      });
+    }
+
+    if (updateResult.status === 403) {
+      console.warn(`[TRIGGER-SIGNING] ⚠️ Update blocked by workflow stage (403) — proceeding with signing anyway`);
+    } else {
+      console.log(`[TRIGGER-SIGNING] ✅ Update successful`);
+    }
+
+    // STEP 6 — Get signing link (try multiple methods)
+    let signingLink = null;
+    let signingLinkSource = null;
+
+    // Method 1: POST then GET to Stella Sign action
+    if (process.env.WORKHUB24_SIGN_ACTION_ID) {
+      const ACTION_ID = process.env.WORKHUB24_SIGN_ACTION_ID;
+      const actionUrl = `${WH_BASE}/api/workflows/${TENANT_ID}/${WORKFLOW_ID}/cards/${doc.workhubCardId}/actions/${ACTION_ID}/execute`;
+
+      console.log(`[TRIGGER-SIGNING] Ensuring valid token for signing action...`);
+      await ensureValidToken();
+
+      console.log(`[TRIGGER-SIGNING] Trying Stella Sign action: ${actionUrl}`);
+
+      for (const method of ['POST', 'GET']) {
+        try {
+          const opts = { method, headers: authHeaders() };
+          if (method === 'POST') opts.body = JSON.stringify({});
+
+          const actionRes = await fetch(actionUrl, opts);
+          const actionText = await actionRes.text();
+          let actionData = {};
+          try { actionData = JSON.parse(actionText); } catch {}
+
+          console.log(`[TRIGGER-SIGNING] ${method} action → HTTP ${actionRes.status}`);
+
+          signingLink = extractUrlFromResponse(actionData);
+          if (signingLink) {
+            signingLinkSource = `${method}_action`;
+            console.log(`[TRIGGER-SIGNING] ✅ Signing link from ${method} action: ${signingLink}`);
+            break;
+          }
+        } catch (err) {
+          console.error(`[TRIGGER-SIGNING] ${method} action error: ${err.message}`);
+        }
+      }
+    }
+
+    // Method 2: Fallback to getWorkHub24FormLink
+    if (!signingLink) {
+      console.log(`[TRIGGER-SIGNING] Trying fallback getWorkHub24FormLink...`);
+      const fallbackResult = await getWorkHub24FormLink(doc.workhubCardId);
+      if (fallbackResult.signingLink) {
+        signingLink = fallbackResult.signingLink;
+        signingLinkSource = "fallback";
+        console.log(`[TRIGGER-SIGNING] ✅ Signing link from fallback: ${signingLink}`);
+      }
+    }
+
+    console.log(`[TRIGGER-SIGNING] Final signing link: ${signingLink || 'NOT FOUND'}`);
+
+    // STEP 7 — Return response
+    return res.status(200).json({
+      success: true,
+      applicationId: normalizedAppId,
+      workhubCardId: normalizedCardId,
+      mongoId: doc._id,
+      signingLink: signingLink || null,
+      signingLinkFound: Boolean(signingLink),
+      signingLinkSource,
+      workhubDataPush: {
+        ok: updateResult.ok,
+        status: updateResult.status
+      },
+      customer: {
+        fullName: doc.fullName,
+        nicNo: doc.nicNo,
+        email: doc.email,
+        mobile1: doc.mobile1
+      }
+    });
+
+  } catch (err) {
+    console.error("[TRIGGER-SIGNING] Unhandled error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: { message: err.message },
+      step: "unhandled"
     });
   }
 });
