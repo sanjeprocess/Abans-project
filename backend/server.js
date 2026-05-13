@@ -3396,17 +3396,42 @@ app.get('/api/test-signing-link/:cardId', async (req, res) => {
   }
 });
 
-app.post("/api/sign/:applicationId", async (req, res) => {
+app.post("/api/sign/:applicationId?", async (req, res) => {
   try {
-    const applicationId = req.params.applicationId.trim().toUpperCase();
-    console.log(`\n=== [SIGN] applicationId=${applicationId} ===`);
+    // Accept applicationId from URL param OR request body
+    const rawId = req.params.applicationId || req.body.applicationId || req.body.application_id || "";
+    const applicationId = rawId.toString().trim().toUpperCase();
+
+    console.log(`\n=== [SIGN] ===`);
+    console.log(`[SIGN] URL param  : ${req.params.applicationId || "(empty)"}`);
+    console.log(`[SIGN] Body       : ${JSON.stringify(req.body)}`);
+    console.log(`[SIGN] Resolved ID: ${applicationId || "(NONE)"}`);
+
+    if (!applicationId) {
+      return res.status(400).json({
+        success: false,
+        message: "applicationId is required — pass it as URL param /api/sign/ABF-2026-00001 or in request body { applicationId: 'ABF-2026-00001' }",
+        received: { urlParam: req.params.applicationId, body: req.body }
+      });
+    }
 
     const doc = await Application.findOne({ applicationId });
     if (!doc) {
-      return res.status(404).json({ success: false, message: `Application not found: ${applicationId}` });
+      return res.status(404).json({
+        success: false,
+        message: `Application not found: ${applicationId}`,
+        applicationId
+      });
     }
+
+    console.log(`[SIGN] Found: ${doc.fullName} | workhubCardId=${doc.workhubCardId}`);
+
     if (!doc.workhubCardId) {
-      return res.status(400).json({ success: false, message: "No WorkHub24 card ID. Submit application first.", applicationId });
+      return res.status(400).json({
+        success: false,
+        message: "No WorkHub24 card ID stored. Submit the application first.",
+        applicationId
+      });
     }
 
     await ensureValidToken();
@@ -3414,7 +3439,11 @@ app.post("/api/sign/:applicationId", async (req, res) => {
     const updateResult = await updateWorkflowCard(doc.workhubCardId, doc.toObject());
     console.log(`[SIGN] WorkHub update → HTTP ${updateResult.status}`);
     if (!updateResult.ok && updateResult.status !== 403) {
-      return res.status(502).json({ success: false, message: `WorkHub24 data push failed: ${updateResult.error}`, applicationId });
+      return res.status(502).json({
+        success: false,
+        message: `WorkHub24 data push failed: ${updateResult.error}`,
+        applicationId
+      });
     }
 
     const ACTION_ID = process.env.WORKHUB24_SIGN_ACTION_ID;
@@ -3424,6 +3453,7 @@ app.post("/api/sign/:applicationId", async (req, res) => {
     if (ACTION_ID) {
       const actionUrl = `${WH_BASE}/api/workflows/${TENANT_ID}/${WORKFLOW_ID}/cards/${doc.workhubCardId}/actions/${ACTION_ID}/execute`;
       console.log(`[SIGN] Action URL: ${actionUrl}`);
+
       for (const method of ["POST", "GET"]) {
         try {
           const opts = { method, headers: authHeaders() };
@@ -3433,26 +3463,32 @@ app.post("/api/sign/:applicationId", async (req, res) => {
           let actionData = {};
           try { actionData = JSON.parse(actionText); } catch {}
           console.log(`[SIGN] ${method} → HTTP ${actionRes.status}`);
-          console.log(`[SIGN] Response body:`, JSON.stringify(actionData, null, 2));
+          console.log(`[SIGN] Body:`, JSON.stringify(actionData, null, 2));
           signingLink = extractUrlFromResponse(actionData);
-          if (signingLink) { signingLinkSource = `${method}_action`; break; }
+          if (signingLink) {
+            signingLinkSource = `${method}_action`;
+            console.log(`[SIGN] ✅ Signing link: ${signingLink}`);
+            break;
+          }
         } catch (err) {
           console.error(`[SIGN] ${method} error: ${err.message}`);
         }
       }
     } else {
-      console.warn("[SIGN] WORKHUB24_SIGN_ACTION_ID not set in .env");
+      console.warn("[SIGN] ⚠️  WORKHUB24_SIGN_ACTION_ID not set in .env — cannot trigger Stella Sign");
     }
 
     if (!signingLink) {
+      console.log("[SIGN] Trying fallback getWorkHub24FormLink...");
       const fallback = await getWorkHub24FormLink(doc.workhubCardId);
       if (fallback.signingLink) {
         signingLink = fallback.signingLink;
         signingLinkSource = fallback.foundAt || "fallback";
+        console.log(`[SIGN] ✅ Fallback link: ${signingLink}`);
       }
     }
 
-    console.log(`[SIGN] Final signing link: ${signingLink || "NOT FOUND"}`);
+    console.log(`[SIGN] Final result: ${signingLink || "NOT FOUND"}`);
 
     return res.status(200).json({
       success: true,
@@ -3462,11 +3498,21 @@ app.post("/api/sign/:applicationId", async (req, res) => {
       signingLinkFound: Boolean(signingLink),
       signingLinkSource: signingLinkSource || null,
       workhubDataPush: { ok: updateResult.ok, status: updateResult.status },
-      customer: { fullName: doc.fullName, nicNo: doc.nicNo, email: doc.email, mobile1: doc.mobile1 },
+      customer: {
+        fullName: doc.fullName,
+        nicNo: doc.nicNo,
+        email: doc.email,
+        mobile1: doc.mobile1
+      }
     });
+
   } catch (err) {
     console.error("[SIGN] Unhandled error:", err.message);
-    return res.status(500).json({ success: false, message: "Internal server error", error: { message: err.message } });
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: { message: err.message }
+    });
   }
 });
 
