@@ -2619,6 +2619,41 @@ app.get('/api/applications/:id', async (req, res) => {
   }
 });
 
+// GET /api/sign-status/:applicationId - Poll for signing link status
+app.get('/api/sign-status/:applicationId', async (req, res) => {
+  try {
+    const applicationId = String(req.params.applicationId || "").trim().toUpperCase();
+
+    if (!applicationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing applicationId parameter'
+      });
+    }
+
+    const doc = await Application.findOne({ applicationId });
+
+    if (!doc) {
+      return res.status(404).json({
+        success: false,
+        error: 'Application not found',
+        applicationId
+      });
+    }
+
+    return res.json({
+      success: true,
+      signingLink: doc.signingLink || null,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+      applicationId: req.params.applicationId
+    });
+  }
+});
+
 // GET /api/workhub-trigger?applicationId=...&workhubCardId=...
 app.get('/api/workhub-trigger', async (req, res) => {
   try {
