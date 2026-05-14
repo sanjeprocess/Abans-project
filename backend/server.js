@@ -651,6 +651,11 @@ async function updateWorkflowCard(cardId, formData) {
       }
     }
 
+    if (res.status === 404) {
+      console.error(`[PUT] Card ${cardId} not found in WorkHub24 (404) — card may have been deleted`);
+      return { ok: false, status: 404, cardId, error: 'Card not found in WorkHub24', notFound: true };
+    }
+
     // If all attempts failed, return partial success if 403, else error
     if (res.status === 403) {
       console.warn(`[PUT] Update blocked by workflow stage (403), proceeding with partial success`);
@@ -2347,7 +2352,7 @@ app.post("/api/trigger-signing", async (req, res) => {
     console.log(`[TRIGGER-SIGNING] Updating WorkHub24 card ${doc.workhubCardId}...`);
     const updateResult = await updateWorkflowCard(doc.workhubCardId, doc.toObject());
 
-    if (!updateResult.ok && updateResult.status !== 403) {
+    if (!updateResult.ok && updateResult.status !== 403 && updateResult.status !== 404) {
       console.log(`[TRIGGER-SIGNING] ❌ Update failed: ${updateResult.error}`);
       return res.status(502).json({
         success: false,
@@ -2361,6 +2366,8 @@ app.post("/api/trigger-signing", async (req, res) => {
 
     if (updateResult.status === 403) {
       console.warn(`[TRIGGER-SIGNING] ⚠️ Update blocked by workflow stage (403) — proceeding with signing anyway`);
+    } else if (updateResult.status === 404) {
+      console.warn(`[SIGN] WorkHub24 update returned 404, but continuing to Stella Sign trigger`);
     } else {
       console.log(`[TRIGGER-SIGNING] ✅ Update successful`);
     }
@@ -2684,7 +2691,7 @@ app.post('/api/workhub-trigger', async (req, res) => {
     const updateResult = await updateWorkflowCard(workhubNumericCardId, doc.toObject());
     console.log(`[WH-TRIGGER] WorkHub24 update → HTTP ${updateResult.status}`);
 
-    if (!updateResult.ok && updateResult.status !== 403) {
+    if (!updateResult.ok && updateResult.status !== 403 && updateResult.status !== 404) {
       return res.status(502).json({
         success: false,
         error: `Failed to push data to WorkHub24: ${updateResult.error}`,
@@ -2695,6 +2702,8 @@ app.post('/api/workhub-trigger', async (req, res) => {
 
     if (updateResult.status === 403) {
       console.warn('[WH-TRIGGER] WorkHub24 update blocked (403) — card may be in locked stage. Proceeding to sign trigger anyway.');
+    } else if (updateResult.status === 404) {
+      console.warn('[SIGN] WorkHub24 update returned 404, but continuing to Stella Sign trigger');
     }
 
     const ACTION_ID = process.env.WORKHUB24_SIGN_ACTION_ID;
@@ -3451,16 +3460,37 @@ app.post("/api/sign/:applicationId?", async (req, res) => {
     const applicationId = rawId.toString().trim().toUpperCase();
 
     console.log(`\n=== [SIGN] ===`);
+    console.log(`[SIGN] Incoming request body keys:`, Object.keys(req.body || {}));
+    console.log(`[SIGN] Has Stella_Link:`, Boolean(req.body?.Stella_Link));
     console.log(`[SIGN] URL param  : ${req.params.applicationId || "(empty)"}`);
     console.log(`[SIGN] Body       : ${JSON.stringify(req.body)}`);
     console.log(`[SIGN] Resolved ID: ${applicationId || "(NONE)"}`);
 
-    if (req.body && req.body.Stella_Link && !applicationId) {
-      console.log('[SIGN] Received Stella_Link webhook callback:', req.body.Stella_Link);
+    // If WorkHub24 is calling back with a signing link, save it and return immediately
+    if (req.body && req.body.Stella_Link) {
+      const stellaLink = req.body.Stella_Link;
+      console.log('[SIGN] Stella_Link received from WorkHub24:', stellaLink);
+      
+      // Save to MongoDB if applicationId is present
+      if (applicationId) {
+        try {
+          await Application.findOneAndUpdate(
+            { applicationId },
+            { $set: { signingLink: stellaLink, signingLinkReceivedAt: new Date() } }
+          );
+          console.log('[SIGN] Saved signingLink to MongoDB for:', applicationId);
+        } catch (err) {
+          console.error('[SIGN] Failed to save signingLink:', err.message);
+        }
+      }
+      
+      console.log('[SIGN] Returning link to frontend');
       return res.status(200).json({
         success: true,
         received: true,
-        stellaLink: req.body.Stella_Link,
+        applicationId: applicationId || null,
+        signingLink: stellaLink,
+        openUrl: stellaLink,
       });
     }
 
@@ -3495,12 +3525,15 @@ app.post("/api/sign/:applicationId?", async (req, res) => {
 
     const updateResult = await updateWorkflowCard(doc.workhubCardId, doc.toObject());
     console.log(`[SIGN] WorkHub update → HTTP ${updateResult.status}`);
-    if (!updateResult.ok && updateResult.status !== 403) {
+    if (!updateResult.ok && updateResult.status !== 403 && updateResult.status !== 404) {
       return res.status(502).json({
         success: false,
         message: `WorkHub24 data push failed: ${updateResult.error}`,
         applicationId
       });
+    }
+    if (updateResult.status === 404) {
+      console.warn('[SIGN] Card not found in WorkHub24, proceeding to Stella Sign anyway...');
     }
 
     const ACTION_ID = process.env.WORKHUB24_SIGN_ACTION_ID;
@@ -3552,6 +3585,7 @@ app.post("/api/sign/:applicationId?", async (req, res) => {
       applicationId,
       workhubCardId: doc.workhubCardId,
       signingLink: signingLink || null,
+      openUrl: signingLink || null,
       signingLinkFound: Boolean(signingLink),
       signingLinkSource: signingLinkSource || null,
       workhubDataPush: { ok: updateResult.ok, status: updateResult.status },
