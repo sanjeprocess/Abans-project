@@ -160,19 +160,21 @@ function ApplicationForm() {
   const [formData, setFormData] = useState(defaultFormData);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState({});
-  const [isSubmittedSuccessfully, setIsSubmittedSuccessfully] = useState(false);
+  const [isSubmittedSuccessfully] = useState(false);
   const [signingLink, setSigningLink] = useState(null);
+  const [pollTimedOut, setPollTimedOut] = useState(false);
   const [loadingState, setLoadingState] = useState({
     visible: false,
     currentStep: 0,
     steps: [
       { id: 1, title: 'Submitting your application...', subtext: 'Please wait while we process your details', status: 'pending' },
       { id: 2, title: 'Saving to WorkHub24...', subtext: 'Creating your application card', status: 'pending' },
-      { id: 3, title: 'Preparing your document...', subtext: 'Generating your Stella Sign document', status: 'pending' },
+      { id: 3, title: 'Preparing your signing document...', subtext: 'Your application was submitted. Preparing your signing document.', status: 'pending' },
       { id: 4, title: 'Almost ready!', subtext: 'Opening your signing document...', status: 'pending' },
     ],
     applicationId: null,
     signingLink: null,
+    pollIntervalId: null,
     error: null,
   });
 
@@ -322,6 +324,97 @@ function ApplicationForm() {
   // Auto-grow textarea
   const autoGrow = (e) => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; };
 
+  const clearPolling = () => {
+    if (loadingState.pollIntervalId) {
+      clearInterval(loadingState.pollIntervalId);
+    }
+    setLoadingState(prev => ({ ...prev, pollIntervalId: null }));
+    setPollTimedOut(false);
+  };
+
+  const checkSigningLinkAgain = async (applicationId) => {
+    if (!applicationId) return;
+
+    setLoadingState(prev => ({
+      ...prev,
+      currentStep: 4,
+      steps: prev.steps.map((s, i) => ({
+        ...s,
+        status: i <= 2 ? 'done' : i === 3 ? 'active' : 'pending'
+      })),
+      error: null,
+    }));
+    setPollTimedOut(false);
+
+    try {
+      const res = await safeFetch(buildApiUrl(`/api/sign-status/${applicationId}`), {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      const link = data.signingLink || null;
+
+      if (link) {
+        setLoadingState(prev => ({
+          ...prev,
+          signingLink: link,
+          steps: prev.steps.map(s => ({ ...s, status: 'done' })),
+        }));
+        setSigningLink(link);
+        setTimeout(() => window.location.href = link, 1000);
+      } else {
+        setPollTimedOut(true);
+      }
+    } catch (err) {
+      console.log('[SIGN STATUS] Manual check failed:', err.message);
+      setPollTimedOut(true);
+    }
+  };
+
+  const pollForSigningLink = (applicationId) => {
+    clearPolling();
+    const startTime = Date.now();
+    const maxWaitMs = 5 * 60 * 1000;
+
+    return new Promise((resolve) => {
+      const intervalId = window.setInterval(async () => {
+        const elapsedMs = Date.now() - startTime;
+        if (elapsedMs > maxWaitMs) {
+          clearInterval(intervalId);
+          setLoadingState(prev => ({ ...prev, pollIntervalId: null }));
+          setPollTimedOut(true);
+          resolve(null);
+          return;
+        }
+
+        try {
+          const res = await safeFetch(buildApiUrl(`/api/sign-status/${applicationId}`), {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          const data = await res.json();
+          const link = data.signingLink || null;
+          if (link) {
+            clearInterval(intervalId);
+            setLoadingState(prev => ({
+              ...prev,
+              signingLink: link,
+              steps: prev.steps.map(s => ({ ...s, status: 'done' })),
+              pollIntervalId: null,
+            }));
+            setSigningLink(link);
+            setTimeout(() => window.location.href = link, 1000);
+            resolve(link);
+          }
+        } catch (err) {
+          console.log('[SIGN STATUS] Poll error:', err.message);
+        }
+      }, 3000);
+
+      setLoadingState(prev => ({ ...prev, pollIntervalId: intervalId }));
+    });
+  };
+
 const handleSubmit = async (e) => {
   e.preventDefault();
   setSubmitted(false);
@@ -376,47 +469,7 @@ const handleSubmit = async (e) => {
     }));
 
     let signingLinkResult = data.signingLink || null;
-
-    if (!signingLinkResult && data.applicationId) {
-      console.log(`[SIGN] Calling /api/sign/${data.applicationId} to get Stella Sign link...`);
-      try {
-        // Small delay to let WorkHub24 finish processing
-        await new Promise(r => setTimeout(r, 2000));
-        const signRes = await safeFetch(buildApiUrl(`/api/sign/${data.applicationId}`), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const signData = await signRes.json();
-        console.log('[SIGN] Response:', signData);
-        if (signData?.signingLink) {
-          signingLinkResult = signData.signingLink;
-          console.log('[SIGN] ✅ Signing link found:', signingLinkResult);
-        } else {
-          console.warn('[SIGN] No signing link returned. signingLinkFound:', signData?.signingLinkFound);
-          // Fallback: poll up to 3 times with 5s interval
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            await new Promise(r => setTimeout(r, 5000));
-            console.log(`[SIGN FALLBACK] Retry ${attempt}...`);
-            try {
-              const retryRes = await safeFetch(buildApiUrl(`/api/sign/${data.applicationId}`), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-              });
-              const retryData = await retryRes.json();
-              if (retryData?.signingLink) {
-                signingLinkResult = retryData.signingLink;
-                console.log('[SIGN FALLBACK] ✅ Found on retry:', signingLinkResult);
-                break;
-              }
-            } catch (retryErr) {
-              console.warn(`[SIGN FALLBACK] Retry ${attempt} failed:`, retryErr.message);
-            }
-          }
-        }
-      } catch (signErr) {
-        console.error('[SIGN] Error calling /api/sign:', signErr.message);
-      }
-    }
+    const applicationId = data.applicationId;
 
     setLoadingState(prev => ({
       ...prev,
@@ -428,21 +481,24 @@ const handleSubmit = async (e) => {
       }))
     }));
 
-    await new Promise(r => setTimeout(r, 1000));
+    if (!signingLinkResult && applicationId) {
+      console.log(`[SIGN] No signing link returned immediately; starting status polling for ${applicationId}`);
+      setPollTimedOut(false);
+      signingLinkResult = await pollForSigningLink(applicationId);
+    }
 
     setSigningLink(signingLinkResult);
     if (signingLinkResult) {
-      console.log('[SUBMIT] Signing link ready, moving to ThankYouPage');
+      console.log('[SUBMIT] Signing link ready, opening after delay');
       setLoadingState(prev => ({
         ...prev,
-        currentStep: 5,
         steps: prev.steps.map(s => ({ ...s, status: 'done' }))
       }));
+      setTimeout(() => window.location.href = signingLinkResult, 1000);
     } else {
-      console.log('[SUBMIT] No signing link after polling; showing thank you page');
+      console.log('[SUBMIT] No signing link after polling; keeping form open for manual retry');
+      setPollTimedOut(true);
     }
-
-    setIsSubmittedSuccessfully(true);
   } catch (error) {
     console.error('[SUBMIT] Error:', error);
     setLoadingState(prev => ({
@@ -460,6 +516,7 @@ const handleSubmit = async (e) => {
 };
 
   const handleReset = () => {
+    clearPolling();
     setFormData(defaultFormData);
     setSubmitted(false);
     setLoadingState(prev => ({
@@ -469,6 +526,7 @@ const handleSubmit = async (e) => {
       steps: prev.steps.map(step => ({ ...step, status: 'pending' })),
       applicationId: null,
       signingLink: null,
+      pollIntervalId: null,
       error: null,
     }));
   };
@@ -530,6 +588,19 @@ const handleSubmit = async (e) => {
               style={{ width: `${(loadingState.currentStep / loadingState.steps.length) * 100}%` }}
             />
           </div>
+
+          {pollTimedOut && (
+            <div className="loading-warning">
+              <p>Your application was submitted successfully, but the signing link is still being prepared. Please wait or try again.</p>
+              <button
+                type="button"
+                className="open-signing-btn"
+                onClick={() => checkSigningLinkAgain(loadingState.applicationId)}
+              >
+                Check signing link again
+              </button>
+            </div>
+          )}
 
           {loadingState.error && (
             <div className="loading-error">
