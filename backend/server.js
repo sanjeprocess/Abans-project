@@ -38,10 +38,10 @@ const DATASTORES = {
 // ⚠️  Must be a fresh ACCESS token (typ:"access"), NOT a refresh token.
 // Get it from WorkHub → top-right profile → Copy Access Token
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN || process.env.AUTH_TOKEN ||
-  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg2NDM1MjIsImlhdCI6MTc3ODY0MjgwMiwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiI1YTdmYzc3YS0xYTJlLTQwYzgtYjg2Yy1hYTZiNzBmOGY0MWIiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NjQyODAxLCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiSUxFR1JFUTVFNEFOWVhIRjdIUFM0NUlZVUlEUUdaTDdHSTVBM1VaWCIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJhY2Nlc3MiLCJ1bmFtZSI6InRoIn0.usNybosd3R9VVmu_X65aQC8dlfBUZanJwiWZbjjGdu5ACv2EjxQ8eitO_CxnrI-Qo-hU97EnzLIs2MHK6FiamQ";
+  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg3Mjk3ODUsImlhdCI6MTc3ODcyOTA2NSwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiJjZDFlYTNhZS0wMzUwLTQ3ZWEtODUwOS0wMWZhMmNhNGZmN2MiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NzI5MDY0LCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiTEo1WVI3RkpMR05PSFNOUlA3RzI0NDZaU1hQTE1GTDdaSEtKTzNISiIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJhY2Nlc3MiLCJ1bmFtZSI6InRoIn0._dEcf-ZeTHjlQLMbxX8ab3HdkfxEJaPOM-SFaljWvjnCl9Tw4ZVrGYmmuKxZkoio4OvPGzgm_RtEFfsWasbHIw";
 
 const REFRESH_TOKEN = process.env.REFRESH_TOKEN || process.env.WH_REFRESH_TOKEN ||
-  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg2Nzg4MDIsImlhdCI6MTc3ODY0MjgwMiwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiI5MmU3YTU0OC1mMGQ0LTRkNGUtYWFmMy0yYTRmM2U5YjcxOTIiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NjQyODAxLCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiSUxFR1JFUTVFNEFOWVhIRjdIUFM0NUlZVUlEUUdaTDdHSTVBM1VaWCIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJyZWZyZXNoIiwidW5hbWUiOiJ0aCJ9.i4g925OSYk3jB5mBMqwJAJ9VQMDZTrex22UqMJ21J0oWAUJRB7NiMBCbL3-IRAOZZAcAd7cdiHKZXxzdAjDtLA";
+  "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ3b3JraHViLmNvbSIsImVudiI6InByb2QiLCJleHAiOjE3Nzg3NjUwNjUsImlhdCI6MTc3ODcyOTA2NSwiaXNzIjoid29ya2h1Yi5jb20iLCJqdGkiOiJjMmMxZWY1NC01NjY5LTQ0NDgtYjU4ZC1mMDM1YTBjYjEwNTkiLCJsbSI6IlBBU1NXT1JEIiwibG9naW5fdXNlcl9pZCI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwibmJmIjoxNzc4NzI5MDY0LCJzY29wZSI6WyJ1OnYiLCJ3OnYiXSwic2lkIjoiTEo1WVI3RkpMR05PSFNOUlA3RzI0NDZaU1hQTE1GTDdaSEtKTzNISiIsInN1YiI6Ilc2WEtaNURXUzZDS1dBNVVCSzJSTE9VWkFXQTdaRUxTIiwidG50IjoiSUo3SjZDV00yWFVKS1ZMS0w3SEhPT0NMUEZNT1dGV1ciLCJ0eXAiOiJyZWZyZXNoIiwidW5hbWUiOiJ0aCJ9.wq2BR-33jH0lNd-fLUW2jgdk8AKUs5WLKXorw-0chTGDytSgH6_JXk3s2pba9PpSXqhQQH2RKt7zAj1zBMXPHQ";
 const TOKEN_EXPIRY_LEEWAY_SECONDS = 60;
 
 let currentAccessToken = ACCESS_TOKEN;
@@ -1797,19 +1797,6 @@ app.post("/api/submit-application", async (req, res) => {
 
     console.log("[SUBMIT] WorkHub actual card id:", workhubActualCardId);
 
-    // Save the real WorkHub card ID back to MongoDB so /api/sign/:applicationId can use it
-    if (workhubActualCardId && mongoSaveResult.ok) {
-      try {
-        await Application.findOneAndUpdate(
-          { applicationId: applicationId.toString() },
-          { $set: { workhubCardId: workhubActualCardId.toString() } }
-        );
-        console.log(`[SUBMIT] ✅ Updated MongoDB workhubCardId to actual: ${workhubActualCardId}`);
-      } catch (updateErr) {
-        console.warn("[SUBMIT] ⚠️ Could not update workhubCardId in MongoDB:", updateErr.message);
-      }
-    }
-
     if (!workhubActualCardId) {
       return res.status(502).json({
         success: false,
@@ -1952,6 +1939,18 @@ app.post("/api/submit-application", async (req, res) => {
       } catch (upsertErr) {
         console.error('❌ [MONGO] Upsert also failed:', upsertErr.message);
         mongoSaveResult.error.upsertError = upsertErr.message;
+      }
+    }
+
+    if (workhubActualCardId && mongoSaveResult.ok) {
+      try {
+        await Application.findOneAndUpdate(
+          { applicationId: applicationId.toString() },
+          { $set: { workhubCardId: workhubActualCardId.toString() } }
+        );
+        console.log(`[SUBMIT] ✅ Updated MongoDB workhubCardId to actual: ${workhubActualCardId}`);
+      } catch (updateErr) {
+        console.warn("[SUBMIT] ⚠️ Could not update workhubCardId in MongoDB:", updateErr.message);
       }
     }
 
@@ -2231,6 +2230,56 @@ app.post("/api/submit-to-workhub", async (req, res) => {
   }
 });
 
+app.post("/api/webhook/stella-signed", async (req, res) => {
+  try {
+    const { Stella_Link, applicationId, workhubCardId } = req.body || {};
+
+    console.log("\n=== [WEBHOOK][STELLA] ===");
+    console.log("[WEBHOOK][STELLA] Received Stella_Link:", Stella_Link);
+    console.log("[WEBHOOK][STELLA] Received payload:", JSON.stringify({ applicationId, workhubCardId }));
+
+    if (!Stella_Link || typeof Stella_Link !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Stella_Link is required and must be a string",
+        received: false,
+      });
+    }
+
+    let updatedDocument = null;
+    if (applicationId && String(applicationId).trim()) {
+      updatedDocument = await Application.findOneAndUpdate(
+        { applicationId: String(applicationId).trim().toUpperCase() },
+        {
+          $set: {
+            signingLink: Stella_Link,
+            signingLinkReceivedAt: new Date(),
+          },
+        },
+        { new: true }
+      );
+
+      if (updatedDocument) {
+        console.log(`[WEBHOOK][STELLA] Updated signingLink for applicationId=${applicationId}`);
+      } else {
+        console.warn(`[WEBHOOK][STELLA] Application not found for applicationId=${applicationId}`);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      received: true,
+      stellaLink: Stella_Link,
+      applicationUpdated: Boolean(updatedDocument),
+      applicationId: applicationId || null,
+      workhubCardId: workhubCardId || null,
+    });
+  } catch (err) {
+    console.error("[WEBHOOK][STELLA] Error:", err);
+    return res.status(500).json({ success: false, message: "Webhook handler error", error: err.message });
+  }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TASK 2 — POST /api/trigger-signing
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2241,7 +2290,6 @@ app.post("/api/trigger-signing", async (req, res) => {
 
     console.log("\n=== [TRIGGER-SIGNING] ===");
 
-    const { applicationId, workhubCardId } = req.body;
     console.log("[TRIGGER-SIGNING] Received body:", { applicationId, workhubCardId });
 
     if (!applicationId || applicationId.toString().trim() === "") {
@@ -3407,6 +3455,15 @@ app.post("/api/sign/:applicationId?", async (req, res) => {
     console.log(`[SIGN] Body       : ${JSON.stringify(req.body)}`);
     console.log(`[SIGN] Resolved ID: ${applicationId || "(NONE)"}`);
 
+    if (req.body && req.body.Stella_Link && !applicationId) {
+      console.log('[SIGN] Received Stella_Link webhook callback:', req.body.Stella_Link);
+      return res.status(200).json({
+        success: true,
+        received: true,
+        stellaLink: req.body.Stella_Link,
+      });
+    }
+
     if (!applicationId) {
       return res.status(400).json({
         success: false,
@@ -3518,7 +3575,10 @@ app.post("/api/sign/:applicationId?", async (req, res) => {
 
 const startServer = (port) => {
   const server = app.listen(port, "0.0.0.0", () => {
-    console.log(`\nAbans Finance backend → http://localhost:${port}`);
+    const publicHost = process.env.PUBLIC_HOST || "13.53.79.153";
+    console.log(`\nAbans Finance backend listening on 0.0.0.0:${port}`);
+    console.log(`Public URL: http://${publicHost}:${port}`);
+    console.log(`If this is on EC2, ensure inbound TCP ${port} is allowed in the security group.`);
   });
 
   server.on("error", (err) => {

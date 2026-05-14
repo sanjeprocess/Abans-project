@@ -144,6 +144,8 @@ const ApplicationSchema = new mongoose.Schema(
     pepRelationship:          { type: String },
     signatureName:            { type: String },
     signatureDate:            { type: Date, default: null },
+    signingLink:              { type: String, default: null },
+    signingLinkReceivedAt:    { type: Date, default: null },
     submittedAt: { type: Date, default: Date.now },
   },
   { strict: false, timestamps: true }
